@@ -1,3 +1,4 @@
+
 export enum TaskStatus {
   INBOX = 'INBOX',
   TODAY = 'TODAY',
@@ -23,6 +24,19 @@ export interface Recipe {
   template: string; // e.g., "Pack for {days} days to {location}"
   taskTemplates: string[]; // e.g., ["Buy ticket to {location}", "Pack {days} pairs of socks"]
   color: string;
+}
+
+export interface StagingItem {
+  id?: number;
+  createdAt: number;
+  summary: string;
+  tasks: Array<{
+    id: string; // temp id
+    content: string;
+    dueAt?: number;
+    responsible?: string;
+    notes?: string;
+  }>;
 }
 
 export type SwipeDirection = 'left' | 'right' | 'down' | 'up';

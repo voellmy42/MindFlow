@@ -8,7 +8,7 @@ import { Circle, CheckCircle2 } from 'lucide-react';
 import { hapticImpact } from '../services/haptics';
 
 const TaskItem: React.FC<{ task: any }> = ({ task }) => {
-  const handleComplete = () => {
+  const handleComplete = (e: React.MouseEvent) => {
       hapticImpact.light();
       db.tasks.update(task.id, { status: TaskStatus.DONE });
   };

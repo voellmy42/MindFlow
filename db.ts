@@ -1,15 +1,17 @@
 import Dexie, { Table } from 'dexie';
-import { Task, Recipe, TaskStatus } from './types';
+import { Task, Recipe, StagingItem } from './types';
 
 class MindFlowDB extends Dexie {
   tasks!: Table<Task>;
   recipes!: Table<Recipe>;
+  staging!: Table<StagingItem>;
 
   constructor() {
     super('MindFlowDB');
-    (this as any).version(1).stores({
+    (this as any).version(2).stores({
       tasks: '++id, status, createdAt, dueAt',
-      recipes: '++id, name'
+      recipes: '++id, name',
+      staging: '++id, createdAt'
     });
   }
 }

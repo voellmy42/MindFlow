@@ -1,5 +1,7 @@
 {
   "name": "MindFlow",
   "description": "A local-first, gamified task manager designed for speed and flow. Features physics-based triage and mad-libs style recipes.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "microphone"
+  ]
 }
