@@ -13,6 +13,7 @@ export interface List {
   color: string;
   icon?: string; // e.g. emoji
   createdAt: number;
+  role?: 'owner' | 'editor'; // 'owner' can delete list, 'editor' can only edit content
 }
 
 export interface Task {

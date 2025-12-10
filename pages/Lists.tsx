@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useSearchParams } from 'react-router-dom';
 import { db } from '../db';
 import { Recipe, TaskStatus, List, Task } from '../types';
 import { hapticImpact } from '../services/haptics';
-import { Plus, X, Trash2, Calendar, Check, ArrowRight, Play, CheckSquare, Zap, ChevronLeft, Circle, Send, AlertCircle } from 'lucide-react';
+import { Plus, X, Trash2, Calendar, Check, ArrowRight, Play, CheckSquare, Zap, ChevronLeft, Circle, Send, Share2, Users, Copy, CheckCircle, Link as LinkIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // --- Constants ---
@@ -29,6 +30,24 @@ const extractVariables = (strings: string[]): string[] => {
   return Array.from(vars);
 };
 
+// Safe Base64 Encoding/Decoding for Unicode
+const safeBtoa = (str: string) => {
+    try {
+        return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,
+            function toSolidBytes(match, p1) {
+                return String.fromCharCode(parseInt('0x' + p1));
+        }));
+    } catch (e) { return ''; }
+}
+
+const safeAtob = (str: string) => {
+    try {
+        return decodeURIComponent(atob(str).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+    } catch (e) { return '{}'; }
+}
+
 // --- COMPONENTS FOR LISTS ---
 
 const CreateListModal = ({ onClose }: { onClose: () => void }) => {
@@ -41,7 +60,8 @@ const CreateListModal = ({ onClose }: { onClose: () => void }) => {
     await db.lists.add({
       name,
       color,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      role: 'owner'
     });
     onClose();
   };
@@ -92,6 +112,116 @@ const CreateListModal = ({ onClose }: { onClose: () => void }) => {
   );
 };
 
+// --- Share Modal ---
+const ShareListModal = ({ list, tasks, onClose }: { list: List, tasks: Task[] | undefined, onClose: () => void }) => {
+  const [copied, setCopied] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
+
+  useEffect(() => {
+    // Generate Snapshot URL
+    const payload = {
+        list: { name: list.name, color: list.color },
+        tasks: tasks?.map(t => ({ content: t.content, status: t.status, notes: t.notes, dueAt: t.dueAt })) || []
+    };
+    try {
+        const token = safeBtoa(JSON.stringify(payload));
+        const url = `${window.location.origin}${window.location.pathname}#/lists?invite=${token}`;
+        setShareUrl(url);
+    } catch (e) {
+        console.error("Failed to generate share link", e);
+    }
+  }, [list, tasks]);
+
+  const handleCopy = async () => {
+    hapticImpact.success();
+    try {
+        await navigator.clipboard.writeText(shareUrl);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+        console.error("Failed to copy", err);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[120] bg-black/40 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
+         <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-sm overflow-hidden"
+         >
+            <div className="flex justify-between items-center mb-6">
+                 <div className="flex items-center gap-3">
+                     <div className="p-3 bg-indigo-50 text-indigo-600 rounded-full">
+                         <Users size={24} />
+                     </div>
+                     <h3 className="text-xl font-bold text-cozy-900">Invite Friends</h3>
+                 </div>
+                 <button onClick={onClose} className="p-2 bg-cozy-50 rounded-full text-cozy-400">
+                     <X size={20} />
+                 </button>
+            </div>
+
+            <p className="text-cozy-500 mb-6 leading-relaxed">
+                Share <span className="font-bold text-cozy-800">{list.name}</span> with others. They will be able to add and edit tasks.
+            </p>
+
+            <div className="bg-cozy-50 p-4 rounded-xl flex items-center gap-3 mb-6 border border-cozy-100 overflow-hidden">
+                <LinkIcon size={18} className="text-cozy-400 shrink-0" />
+                <div className="flex-1 truncate text-xs text-cozy-600 font-medium font-mono select-all">
+                    {shareUrl}
+                </div>
+            </div>
+
+            <button 
+                onClick={handleCopy}
+                className={`w-full py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${copied ? 'bg-green-500 text-white' : 'bg-cozy-900 text-white'}`}
+            >
+                {copied ? <><CheckCircle size={20} /> Copied!</> : <><Copy size={20} /> Copy Link</>}
+            </button>
+         </motion.div>
+    </div>
+  );
+};
+
+// --- Accept Invite Modal ---
+const AcceptInviteModal = ({ inviteData, onAccept, onCancel }: { inviteData: any, onAccept: () => void, onCancel: () => void }) => {
+    return (
+        <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+            <motion.div 
+                initial={{ scale: 0.8, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm text-center"
+            >
+                <div className={`w-20 h-20 mx-auto rounded-full ${inviteData.list.color} flex items-center justify-center mb-6 shadow-inner`}>
+                    <Users size={40} className="text-cozy-800 opacity-50" />
+                </div>
+                
+                <h2 className="text-2xl font-extrabold text-cozy-900 mb-2">Join List?</h2>
+                <p className="text-cozy-500 mb-8">
+                    You've been invited to collaborate on <br/>
+                    <strong className="text-cozy-900 text-lg">"{inviteData.list.name}"</strong>
+                </p>
+
+                <div className="flex flex-col gap-3">
+                    <button 
+                        onClick={onAccept}
+                        className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-lg shadow-xl shadow-indigo-200 active:scale-[0.98] transition-transform"
+                    >
+                        Accept Invite
+                    </button>
+                    <button 
+                        onClick={onCancel}
+                        className="w-full py-4 text-cozy-400 font-bold hover:text-cozy-600 transition-colors"
+                    >
+                        No thanks
+                    </button>
+                </div>
+            </motion.div>
+        </div>
+    );
+};
+
 // --- Delete Confirmation Modal ---
 const DeleteConfirmationModal = ({ 
     title, 
@@ -139,7 +269,11 @@ const DeleteConfirmationModal = ({
 const ListDetailView = ({ list, onClose }: { list: List, onClose: () => void }) => {
     const [input, setInput] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
     
+    // Check permissions
+    const isOwner = list.role !== 'editor';
+
     const tasks = useLiveQuery(() => 
         db.tasks.where('listId').equals(list.id!).and(t => t.status !== TaskStatus.DELETED && t.status !== TaskStatus.DONE).toArray()
     , [list.id]);
@@ -189,17 +323,30 @@ const ListDetailView = ({ list, onClose }: { list: List, onClose: () => void }) 
                         >
                             <ChevronLeft size={28} />
                         </button>
-                        <button 
-                            onClick={() => { hapticImpact.medium(); setShowDeleteConfirm(true); }}
-                            className="p-3 rounded-full hover:bg-black/5 active:bg-black/10 transition-colors text-cozy-900"
-                        >
-                            <Trash2 size={24} />
-                        </button>
+                        
+                        <div className="flex gap-1">
+                            <button 
+                                onClick={() => { hapticImpact.medium(); setShowShareModal(true); }}
+                                className="p-3 rounded-full hover:bg-black/5 active:bg-black/10 transition-colors text-cozy-900"
+                            >
+                                <Share2 size={24} />
+                            </button>
+                            {isOwner && (
+                                <button 
+                                    onClick={() => { hapticImpact.medium(); setShowDeleteConfirm(true); }}
+                                    className="p-3 rounded-full hover:bg-black/5 active:bg-black/10 transition-colors text-cozy-900"
+                                >
+                                    <Trash2 size={24} />
+                                </button>
+                            )}
+                        </div>
                     </div>
                     
                     <div>
                         <h1 className="text-4xl font-extrabold text-cozy-900 leading-tight tracking-tight break-words">{list.name}</h1>
-                        <p className="text-cozy-900/60 font-bold text-sm mt-1 uppercase tracking-wide opacity-80">{tasks?.length || 0} Tasks</p>
+                        <p className="text-cozy-900/60 font-bold text-sm mt-1 uppercase tracking-wide opacity-80">
+                            {tasks?.length || 0} Tasks {isOwner ? '' : '(Shared)'}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -256,6 +403,13 @@ const ListDetailView = ({ list, onClose }: { list: List, onClose: () => void }) 
                         message="This will permanently remove the list and all its pending tasks. This action cannot be undone."
                         onConfirm={confirmDelete}
                         onCancel={() => setShowDeleteConfirm(false)}
+                    />
+                )}
+                {showShareModal && (
+                    <ShareListModal 
+                        list={list} 
+                        tasks={tasks}
+                        onClose={() => setShowShareModal(false)}
                     />
                 )}
             </AnimatePresence>
@@ -520,6 +674,53 @@ export const Lists = () => {
     const [activeRecipe, setActiveRecipe] = useState<Recipe | null>(null);
     const [activeList, setActiveList] = useState<List | null>(null);
 
+    // Invite Handling
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [inviteData, setInviteData] = useState<any | null>(null);
+
+    useEffect(() => {
+        const inviteCode = searchParams.get('invite');
+        if (inviteCode) {
+            try {
+                const data = JSON.parse(safeAtob(inviteCode));
+                if (data && data.list) {
+                    setInviteData(data);
+                }
+            } catch (e) {
+                console.error("Invalid invite code");
+            }
+        }
+    }, [searchParams]);
+
+    const handleAcceptInvite = async () => {
+        if (!inviteData) return;
+        hapticImpact.success();
+        
+        // Create List with EDITOR role
+        const listId = await db.lists.add({
+            name: inviteData.list.name,
+            color: inviteData.list.color,
+            createdAt: Date.now(),
+            role: 'editor' // Enforce role
+        });
+
+        // Add Tasks
+        if (inviteData.tasks && inviteData.tasks.length > 0) {
+            const tasks = inviteData.tasks.map((t: any) => ({
+                ...t,
+                listId,
+                createdAt: Date.now(),
+                // Reset status to INBOX unless specified, but for snapshot we usually keep as is or default to Inbox
+                // Let's keep status if it makes sense, or default to INBOX for new users
+                status: TaskStatus.INBOX 
+            }));
+            await db.tasks.bulkAdd(tasks);
+        }
+
+        setInviteData(null);
+        setSearchParams({}); // Clear URL
+    };
+
     return (
         <div className="pt-10 px-6 pb-24 min-h-screen flex flex-col">
             <header className="mb-6">
@@ -557,7 +758,11 @@ export const Lists = () => {
                                 <div className="absolute top-4 right-4 opacity-50">
                                     <ChevronLeft size={24} className="rotate-180 text-cozy-900" />
                                 </div>
-                                <div className="flex-1"></div>
+                                <div className="flex-1">
+                                    {list.role === 'editor' && (
+                                        <Users size={20} className="text-cozy-900 opacity-20" />
+                                    )}
+                                </div>
                                 <div>
                                     <h3 className="text-xl font-bold text-cozy-900 leading-tight mb-1">{list.name}</h3>
                                 </div>
@@ -621,6 +826,13 @@ export const Lists = () => {
                 {isCreatingRecipe && <CreateRecipeModal onClose={() => setIsCreatingRecipe(false)} />}
                 {activeRecipe && <RunRecipeModal recipe={activeRecipe} onClose={() => setActiveRecipe(null)} />}
                 {activeList && <ListDetailView list={activeList} onClose={() => setActiveList(null)} />}
+                {inviteData && (
+                    <AcceptInviteModal 
+                        inviteData={inviteData} 
+                        onAccept={handleAcceptInvite} 
+                        onCancel={() => { setInviteData(null); setSearchParams({}); }}
+                    />
+                )}
             </AnimatePresence>
         </div>
     );
