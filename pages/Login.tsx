@@ -11,9 +11,13 @@ declare global {
 }
 
 // ----------------------------------------------------------------------
-// ⚠️ IMPORTANT: REPLACE THIS WITH YOUR GOOGLE CLOUD CLIENT ID
+// Load from Environment Variable or fall back to the provided ID
 // ----------------------------------------------------------------------
-const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID"; 
+// Cast import.meta to any to resolve TS error with env property
+const ENV_CLIENT_ID = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_ID = ENV_CLIENT_ID && ENV_CLIENT_ID !== "YOUR_GOOGLE_CLIENT_ID" 
+    ? ENV_CLIENT_ID 
+    : "1082993055232-r7sr98j8rk57cjhc04pcbqmlsc27sjt2.apps.googleusercontent.com"; 
 
 export const Login = () => {
   const { loginWithGoogle, continueAsGuest } = useAuth();
@@ -22,8 +26,9 @@ export const Login = () => {
   useEffect(() => {
     // Debugging Helper: Log the current origin so the user knows what to whitelist
     console.log("MindFlow: Current Window Origin (Add this to Google Cloud 'Authorized JavaScript origins'):", window.location.origin);
+    console.log("MindFlow: Using Client ID:", GOOGLE_CLIENT_ID);
 
-    if (GOOGLE_CLIENT_ID === "YOUR_GOOGLE_CLIENT_ID") {
+    if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID === "YOUR_GOOGLE_CLIENT_ID") {
         setError("Missing Client ID");
         return;
     }
@@ -94,7 +99,7 @@ export const Login = () => {
                  <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 text-sm flex flex-col items-center gap-2">
                      <AlertCircle size={24} />
                      <span className="font-bold">Setup Required</span>
-                     <span className="text-xs">Open <code>pages/Login.tsx</code> and paste your Google Client ID.</span>
+                     <span className="text-xs">Add Client ID to code or Env Vars.</span>
                  </div>
              ) : (
                  <>
@@ -131,6 +136,15 @@ export const Login = () => {
 
       <div className="mt-8 text-center text-cozy-400 text-xs max-w-xs">
         <p>By continuing you agree to the Terms & Privacy Policy.</p>
+        
+        {/* Debug Info for Deployment */}
+        <div className="mt-6 p-3 bg-white/50 backdrop-blur rounded-xl border border-cozy-200 text-left">
+             <p className="font-bold text-cozy-500 text-[10px] mb-1 uppercase tracking-wider">Configuration Check</p>
+             <p className="text-[10px] text-cozy-400 mb-1">Add this URL to Google Cloud "Authorized JavaScript origins":</p>
+             <code className="block p-2 bg-cozy-100 rounded text-[10px] font-mono text-cozy-800 break-all select-all">
+                {window.location.origin}
+             </code>
+        </div>
       </div>
     </div>
   );
