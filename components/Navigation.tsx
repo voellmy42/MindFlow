@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { Inbox, Layers, Zap, Calendar } from 'lucide-react';
+import { Inbox, Layers, List, Calendar } from 'lucide-react';
 import { vibrate } from '../services/haptics';
 
 const NavItem = ({ to, icon: Icon, active, label }: { to: string; icon: any; active: boolean; label: string }) => (
@@ -24,7 +25,7 @@ export const Navigation = () => {
       <NavItem to="/" icon={Inbox} active={location.pathname === '/' || location.pathname === '/capture'} label="Flow" />
       <NavItem to="/triage" icon={Layers} active={location.pathname === '/triage'} label="Triage" />
       <NavItem to="/all" icon={Calendar} active={location.pathname === '/all'} label="Plan" />
-      <NavItem to="/recipes" icon={Zap} active={location.pathname === '/recipes'} label="Recipes" />
+      <NavItem to="/lists" icon={List} active={location.pathname === '/lists'} label="Lists" />
     </nav>
   );
 };

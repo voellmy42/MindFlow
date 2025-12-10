@@ -1,25 +1,29 @@
+
 import Dexie, { Table } from 'dexie';
-import { Task, Recipe, StagingItem } from './types';
+import { Task, Recipe, StagingItem, List } from './types';
 
 class MindFlowDB extends Dexie {
   tasks!: Table<Task>;
   recipes!: Table<Recipe>;
   staging!: Table<StagingItem>;
+  lists!: Table<List>;
 
   constructor() {
     super('MindFlowDB');
-    (this as any).version(3).stores({
-      tasks: '++id, status, createdAt, dueAt, ownerId',
+    (this as any).version(4).stores({
+      tasks: '++id, status, createdAt, dueAt, ownerId, listId',
       recipes: '++id, name, ownerId',
-      staging: '++id, createdAt'
+      staging: '++id, createdAt',
+      lists: '++id, name, createdAt'
     });
   }
 }
 
 export const db = new MindFlowDB();
 
-// Seed initial recipes if empty
+// Seed initial data
 (db as any).on('populate', () => {
+  // Seed Recipes
   db.recipes.add({
     name: 'Travel Prep',
     template: 'Trip to {destination} for {days} days',
@@ -41,5 +45,24 @@ export const db = new MindFlowDB();
       'Process email inbox'
     ],
     color: 'bg-indigo-200'
+  });
+
+  // Seed Lists
+  db.lists.add({
+    name: 'Personal',
+    color: 'bg-sky-200',
+    createdAt: Date.now()
+  });
+  
+  db.lists.add({
+    name: 'Work',
+    color: 'bg-orange-200',
+    createdAt: Date.now()
+  });
+  
+  db.lists.add({
+    name: 'Groceries',
+    color: 'bg-emerald-200',
+    createdAt: Date.now()
   });
 });

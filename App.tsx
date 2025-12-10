@@ -1,9 +1,10 @@
+
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Navigation } from './components/Navigation';
 import { Inbox } from './pages/Inbox';
 import { Triage } from './pages/Triage';
-import { Recipes } from './pages/Recipes';
+import { Lists } from './pages/Lists';
 import { AllTasks } from './pages/AllTasks';
 import { Login } from './pages/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -31,7 +32,7 @@ const AppContent = () => {
           <Routes>
             <Route path="/" element={<Inbox />} />
             <Route path="/triage" element={<Triage />} />
-            <Route path="/recipes" element={<Recipes />} />
+            <Route path="/lists" element={<Lists />} />
             <Route path="/all" element={<AllTasks />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

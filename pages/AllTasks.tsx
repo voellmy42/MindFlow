@@ -1,9 +1,10 @@
+
 import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { Task, TaskStatus } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Circle, CalendarDays, X, User, AlignLeft, Calendar as CalendarIcon, Save, ChevronLeft, ChevronRight, Slash } from 'lucide-react';
+import { Circle, CalendarDays, X, User, AlignLeft, Calendar as CalendarIcon, Save, ChevronLeft, ChevronRight, Slash, List as ListIcon } from 'lucide-react';
 import { hapticImpact } from '../services/haptics';
 
 // --- Calendar Picker Component ---
@@ -133,7 +134,10 @@ const TaskDetailModal: React.FC<{ task: Task; onClose: () => void }> = ({ task, 
   const [dueAt, setDueAt] = useState<Date | null>(task.dueAt ? new Date(task.dueAt) : null);
   const [responsible, setResponsible] = useState(task.responsible || '');
   const [notes, setNotes] = useState(task.notes || '');
+  const [listId, setListId] = useState<number | undefined>(task.listId);
   const [showCalendar, setShowCalendar] = useState(false);
+
+  const lists = useLiveQuery(() => db.lists.toArray());
 
   const handleSave = async () => {
     hapticImpact.success();
@@ -141,7 +145,8 @@ const TaskDetailModal: React.FC<{ task: Task; onClose: () => void }> = ({ task, 
       content,
       dueAt: dueAt ? dueAt.getTime() : undefined,
       responsible,
-      notes
+      notes,
+      listId
     });
     onClose();
   };
@@ -200,6 +205,41 @@ const TaskDetailModal: React.FC<{ task: Task; onClose: () => void }> = ({ task, 
                             <div className="text-lg font-medium text-cozy-900">
                             {dueAt ? dueAt.toLocaleDateString(undefined, { weekday: 'short', month: 'long', day: 'numeric' }) : <span className="text-cozy-400">Set a date...</span>}
                             </div>
+                    </div>
+                </div>
+
+                {/* List Selector */}
+                <div className="flex items-start gap-4 p-4 bg-cozy-50 rounded-2xl border border-transparent transition-all">
+                    <div className="p-3 bg-white shadow-sm text-sky-600 rounded-xl mt-1">
+                        <ListIcon size={24} />
+                    </div>
+                    <div className="flex-1">
+                        <div className="text-xs font-bold text-cozy-400 uppercase tracking-wide mb-2">List</div>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={() => setListId(undefined)}
+                                className={`px-3 py-2 rounded-xl text-sm font-bold transition-all ${
+                                    listId === undefined
+                                    ? 'bg-cozy-800 text-white shadow-md' 
+                                    : 'bg-white text-cozy-500 hover:bg-cozy-100'
+                                }`}
+                            >
+                                Inbox
+                            </button>
+                            {lists?.map(list => (
+                                <button
+                                    key={list.id}
+                                    onClick={() => setListId(list.id)}
+                                    className={`px-3 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+                                        listId === list.id
+                                        ? `${list.color} text-cozy-900 ring-2 ring-cozy-900 ring-offset-1`
+                                        : `${list.color} text-cozy-800 opacity-60 hover:opacity-100`
+                                    }`}
+                                >
+                                    {list.name}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
@@ -272,6 +312,9 @@ const TaskItem: React.FC<{ task: Task; onSelect: (t: Task) => void }> = ({ task,
     hapticImpact.light();
     db.tasks.update(task.id, { status: TaskStatus.DONE });
   };
+  
+  // Fetch list name if exists
+  const list = useLiveQuery(() => task.listId ? db.lists.get(task.listId) : Promise.resolve(undefined), [task.listId]);
 
   return (
     <motion.div
@@ -288,6 +331,11 @@ const TaskItem: React.FC<{ task: Task; onSelect: (t: Task) => void }> = ({ task,
           <span className="text-cozy-800 font-medium text-lg leading-tight block">{task.content}</span>
           
           <div className="flex flex-wrap gap-2 mt-2">
+             {list && (
+                <span className={`text-[11px] ${list.color} text-cozy-800 px-2 py-1 rounded-md flex items-center gap-1.5 font-bold`}>
+                     {list.name}
+                </span>
+             )}
              {task.dueAt && (
                 <span className="text-[11px] bg-cozy-100 text-cozy-500 px-2 py-1 rounded-md flex items-center gap-1.5 font-medium">
                      <CalendarDays size={12} />

@@ -7,6 +7,14 @@ export enum TaskStatus {
   DELETED = 'DELETED',
 }
 
+export interface List {
+  id?: number;
+  name: string;
+  color: string;
+  icon?: string; // e.g. emoji
+  createdAt: number;
+}
+
 export interface Task {
   id?: number;
   content: string;
@@ -17,6 +25,7 @@ export interface Task {
   responsible?: string;
   notes?: string;
   ownerId?: string; // For syncing/sharing
+  listId?: number; // Link to a List
 }
 
 export interface Recipe {
