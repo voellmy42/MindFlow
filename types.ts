@@ -16,6 +16,7 @@ export interface Task {
   source?: 'manual' | 'share' | 'recipe';
   responsible?: string;
   notes?: string;
+  ownerId?: string; // For syncing/sharing
 }
 
 export interface Recipe {
@@ -24,6 +25,7 @@ export interface Recipe {
   template: string; // e.g., "Pack for {days} days to {location}"
   taskTemplates: string[]; // e.g., ["Buy ticket to {location}", "Pack {days} pairs of socks"]
   color: string;
+  ownerId?: string; // For syncing/sharing
 }
 
 export interface StagingItem {

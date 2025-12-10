@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { TaskStatus } from '../types';
 import { QuickCapture } from '../components/QuickCapture';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Circle, CheckCircle2 } from 'lucide-react';
+import { Circle, CheckCircle2, LogOut } from 'lucide-react';
 import { hapticImpact } from '../services/haptics';
+import { useAuth } from '../contexts/AuthContext';
 
 const TaskItem: React.FC<{ task: any }> = ({ task }) => {
   const handleComplete = (e: React.MouseEvent) => {
@@ -35,6 +36,9 @@ const TaskItem: React.FC<{ task: any }> = ({ task }) => {
 };
 
 export const Inbox = () => {
+  const { user, logout } = useAuth();
+  const [showProfile, setShowProfile] = useState(false);
+
   const todayTasks = useLiveQuery(() => 
     db.tasks.where('status').equals(TaskStatus.TODAY).toArray()
   );
@@ -45,15 +49,51 @@ export const Inbox = () => {
 
   return (
     <div className="min-h-screen pb-32">
-      <header className="pt-10 px-6 mb-2">
-        <h1 className="text-3xl font-bold text-cozy-900">Today</h1>
-        <div className="flex items-center gap-2 mt-1">
-            <span className="text-cozy-500 font-medium">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
-            {inboxCount ? (
-                 <span className="bg-rose-100 text-rose-600 text-xs px-2 py-0.5 rounded-full font-bold">
-                    {inboxCount} in Inbox
-                 </span>
-            ) : null}
+      <header className="pt-10 px-6 mb-2 flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold text-cozy-900">Today</h1>
+          <div className="flex items-center gap-2 mt-1">
+              <span className="text-cozy-500 font-medium">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+              {inboxCount ? (
+                  <span className="bg-rose-100 text-rose-600 text-xs px-2 py-0.5 rounded-full font-bold">
+                      {inboxCount} in Inbox
+                  </span>
+              ) : null}
+          </div>
+        </div>
+        
+        {/* User Avatar / Profile Menu */}
+        <div className="relative">
+            <button 
+                onClick={() => setShowProfile(!showProfile)}
+                className="w-10 h-10 rounded-full bg-cozy-100 border border-white shadow-sm overflow-hidden active:scale-95 transition-transform"
+            >
+                <img src={user?.avatar} alt={user?.name} className="w-full h-full object-cover" />
+            </button>
+            <AnimatePresence>
+                {showProfile && (
+                    <>
+                        <div className="fixed inset-0 z-10" onClick={() => setShowProfile(false)} />
+                        <motion.div 
+                            initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                            className="absolute right-0 top-12 w-48 bg-white rounded-2xl shadow-xl border border-cozy-100 p-2 z-20 origin-top-right"
+                        >
+                            <div className="px-3 py-2 border-b border-cozy-50 mb-1">
+                                <p className="text-sm font-bold text-cozy-900 truncate">{user?.name}</p>
+                                <p className="text-xs text-cozy-400 truncate">{user?.email || 'Guest Mode'}</p>
+                            </div>
+                            <button 
+                                onClick={() => { logout(); }}
+                                className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-xl transition-colors flex items-center gap-2"
+                            >
+                                <LogOut size={14} /> Sign Out
+                            </button>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
         </div>
       </header>
 

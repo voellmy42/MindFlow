@@ -8,9 +8,9 @@ class MindFlowDB extends Dexie {
 
   constructor() {
     super('MindFlowDB');
-    (this as any).version(2).stores({
-      tasks: '++id, status, createdAt, dueAt',
-      recipes: '++id, name',
+    (this as any).version(3).stores({
+      tasks: '++id, status, createdAt, dueAt, ownerId',
+      recipes: '++id, name, ownerId',
       staging: '++id, createdAt'
     });
   }
