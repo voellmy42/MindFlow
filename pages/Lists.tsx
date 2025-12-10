@@ -5,8 +5,9 @@ import { useSearchParams } from 'react-router-dom';
 import { db } from '../db';
 import { Recipe, TaskStatus, List, Task } from '../types';
 import { hapticImpact } from '../services/haptics';
-import { Plus, X, Trash2, Calendar, Check, ArrowRight, Play, CheckSquare, Zap, ChevronLeft, Circle, Send, Share2, Users, Copy, CheckCircle, Link as LinkIcon, LayoutGrid, StretchHorizontal } from 'lucide-react';
+import { Plus, X, Trash2, Calendar, Check, ArrowRight, Play, CheckSquare, Zap, ChevronLeft, Circle, Send, Share2, Users, Copy, CheckCircle, Link as LinkIcon, LayoutGrid, StretchHorizontal, RefreshCw, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { TaskDetailModal } from '../components/TaskDetailModal';
 
 // --- Constants ---
 const COLORS = [
@@ -57,6 +58,7 @@ const CreateListModal = ({ onClose }: { onClose: () => void }) => {
   const handleSave = async () => {
     if (!name.trim()) return;
     hapticImpact.success();
+    // Hook in db.ts handles sharedId generation
     await db.lists.add({
       name,
       color,
@@ -116,23 +118,45 @@ const CreateListModal = ({ onClose }: { onClose: () => void }) => {
 const ShareListModal = ({ list, tasks, onClose }: { list: List, tasks: Task[] | undefined, onClose: () => void }) => {
   const [copied, setCopied] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Generate Snapshot URL
-    const payload = {
-        list: { name: list.name, color: list.color },
-        tasks: tasks?.map(t => ({ content: t.content, status: t.status, notes: t.notes, dueAt: t.dueAt })) || []
+    // Wait for tasks to be populated (array not undefined)
+    if (tasks === undefined) return;
+
+    const generateLink = async () => {
+        // Ensure sharedId exists
+        let finalSharedId = list.sharedId;
+        if (!finalSharedId && list.id) {
+            finalSharedId = crypto.randomUUID();
+            await db.lists.update(list.id, { sharedId: finalSharedId });
+        }
+
+        // Generate Snapshot URL including publicId for smart merging
+        const payload = {
+            list: { name: list.name, color: list.color, sharedId: finalSharedId },
+            tasks: tasks.map(t => ({ 
+                publicId: t.publicId, // CRITICAL: Send publicId for sync
+                content: t.content, 
+                status: t.status, 
+                notes: t.notes, 
+                dueAt: t.dueAt 
+            }))
+        };
+        try {
+            const token = safeBtoa(JSON.stringify(payload));
+            const url = `${window.location.origin}${window.location.pathname}#/lists?invite=${token}`;
+            setShareUrl(url);
+            setIsReady(true);
+        } catch (e) {
+            console.error("Failed to generate share link", e);
+        }
     };
-    try {
-        const token = safeBtoa(JSON.stringify(payload));
-        const url = `${window.location.origin}${window.location.pathname}#/lists?invite=${token}`;
-        setShareUrl(url);
-    } catch (e) {
-        console.error("Failed to generate share link", e);
-    }
+    generateLink();
   }, [list, tasks]);
 
   const handleCopy = async () => {
+    if (!isReady) return;
     hapticImpact.success();
     try {
         await navigator.clipboard.writeText(shareUrl);
@@ -155,7 +179,7 @@ const ShareListModal = ({ list, tasks, onClose }: { list: List, tasks: Task[] | 
                      <div className="p-3 bg-indigo-50 text-indigo-600 rounded-full">
                          <Users size={24} />
                      </div>
-                     <h3 className="text-xl font-bold text-cozy-900">Invite Friends</h3>
+                     <h3 className="text-xl font-bold text-cozy-900">Invite & Sync</h3>
                  </div>
                  <button onClick={onClose} className="p-2 bg-cozy-50 rounded-full text-cozy-400">
                      <X size={20} />
@@ -163,29 +187,38 @@ const ShareListModal = ({ list, tasks, onClose }: { list: List, tasks: Task[] | 
             </div>
 
             <p className="text-cozy-500 mb-6 leading-relaxed">
-                Share <span className="font-bold text-cozy-800">{list.name}</span> with others. They will be able to add and edit tasks.
+                Share <span className="font-bold text-cozy-800">{list.name}</span>. This link acts as a "Sync Packet". Re-share it to send updates.
             </p>
 
-            <div className="bg-cozy-50 p-4 rounded-xl flex items-center gap-3 mb-6 border border-cozy-100 overflow-hidden">
-                <LinkIcon size={18} className="text-cozy-400 shrink-0" />
-                <div className="flex-1 truncate text-xs text-cozy-600 font-medium font-mono select-all">
-                    {shareUrl}
-                </div>
-            </div>
+            {isReady ? (
+                <>
+                    <div className="bg-cozy-50 p-4 rounded-xl flex items-center gap-3 mb-6 border border-cozy-100 overflow-hidden">
+                        <LinkIcon size={18} className="text-cozy-400 shrink-0" />
+                        <div className="flex-1 truncate text-xs text-cozy-600 font-medium font-mono select-all">
+                            {shareUrl}
+                        </div>
+                    </div>
 
-            <button 
-                onClick={handleCopy}
-                className={`w-full py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${copied ? 'bg-green-500 text-white' : 'bg-cozy-900 text-white'}`}
-            >
-                {copied ? <><CheckCircle size={20} /> Copied!</> : <><Copy size={20} /> Copy Link</>}
-            </button>
+                    <button 
+                        onClick={handleCopy}
+                        className={`w-full py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${copied ? 'bg-green-500 text-white' : 'bg-cozy-900 text-white'}`}
+                    >
+                        {copied ? <><CheckCircle size={20} /> Copied!</> : <><Copy size={20} /> Copy Link</>}
+                    </button>
+                </>
+            ) : (
+                <div className="py-8 flex flex-col items-center text-cozy-400">
+                    <Loader2 size={32} className="animate-spin mb-2" />
+                    <span className="text-sm">Generating snapshot...</span>
+                </div>
+            )}
          </motion.div>
     </div>
   );
 };
 
 // --- Accept Invite Modal ---
-const AcceptInviteModal = ({ inviteData, onAccept, onCancel }: { inviteData: any, onAccept: () => void, onCancel: () => void }) => {
+const AcceptInviteModal = ({ inviteData, existingList, onAccept, onCancel }: { inviteData: any, existingList?: List, onAccept: () => void, onCancel: () => void }) => {
     return (
         <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
             <motion.div 
@@ -193,14 +226,28 @@ const AcceptInviteModal = ({ inviteData, onAccept, onCancel }: { inviteData: any
                 animate={{ scale: 1, y: 0 }}
                 className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm text-center"
             >
-                <div className={`w-20 h-20 mx-auto rounded-full ${inviteData.list.color} flex items-center justify-center mb-6 shadow-inner`}>
-                    <Users size={40} className="text-cozy-800 opacity-50" />
+                <div className={`w-20 h-20 mx-auto rounded-full ${inviteData.list.color} flex items-center justify-center mb-6 shadow-inner relative`}>
+                    {existingList ? (
+                        <RefreshCw size={40} className="text-cozy-800 opacity-50" />
+                    ) : (
+                        <Users size={40} className="text-cozy-800 opacity-50" />
+                    )}
                 </div>
                 
-                <h2 className="text-2xl font-extrabold text-cozy-900 mb-2">Join List?</h2>
+                <h2 className="text-2xl font-extrabold text-cozy-900 mb-2">
+                    {existingList ? "Sync Updates?" : "Join List?"}
+                </h2>
                 <p className="text-cozy-500 mb-8">
-                    You've been invited to collaborate on <br/>
-                    <strong className="text-cozy-900 text-lg">"{inviteData.list.name}"</strong>
+                    {existingList ? (
+                         <>
+                            Update <strong className="text-cozy-900">"{existingList.name}"</strong> with new tasks from the snapshot?
+                         </>
+                    ) : (
+                        <>
+                            You've been invited to collaborate on <br/>
+                            <strong className="text-cozy-900 text-lg">"{inviteData.list.name}"</strong>
+                        </>
+                    )}
                 </p>
 
                 <div className="flex flex-col gap-3">
@@ -208,13 +255,13 @@ const AcceptInviteModal = ({ inviteData, onAccept, onCancel }: { inviteData: any
                         onClick={onAccept}
                         className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-lg shadow-xl shadow-indigo-200 active:scale-[0.98] transition-transform"
                     >
-                        Accept Invite
+                        {existingList ? "Merge Changes" : "Accept Invite"}
                     </button>
                     <button 
                         onClick={onCancel}
                         className="w-full py-4 text-cozy-400 font-bold hover:text-cozy-600 transition-colors"
                     >
-                        No thanks
+                        Cancel
                     </button>
                 </div>
             </motion.div>
@@ -270,18 +317,25 @@ const ListDetailView = ({ list, onClose }: { list: List, onClose: () => void }) 
     const [input, setInput] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showShareModal, setShowShareModal] = useState(false);
+    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     
     // Check permissions
     const isOwner = list.role !== 'editor';
 
-    const tasks = useLiveQuery(() => 
-        db.tasks.where('listId').equals(list.id!).and(t => t.status !== TaskStatus.DELETED && t.status !== TaskStatus.DONE).toArray()
+    // We fetch ALL tasks for this list to ensure the share snapshot is complete
+    // We only display active ones, but might want to share DONE ones too depending on logic
+    // For now, let's just fetch everything to pass to ShareModal, and filter for display
+    const allListTasks = useLiveQuery(() => 
+        db.tasks.where('listId').equals(list.id!).toArray()
     , [list.id]);
+    
+    const displayTasks = allListTasks?.filter(t => t.status !== TaskStatus.DELETED && t.status !== TaskStatus.DONE);
 
     const handleAddTask = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim()) return;
         hapticImpact.success();
+        // db.ts hook handles UUID generation
         await db.tasks.add({
             content: input,
             status: TaskStatus.INBOX,
@@ -345,7 +399,7 @@ const ListDetailView = ({ list, onClose }: { list: List, onClose: () => void }) 
                     <div>
                         <h1 className="text-4xl font-extrabold text-cozy-900 leading-tight tracking-tight break-words">{list.name}</h1>
                         <p className="text-cozy-900/60 font-bold text-sm mt-1 uppercase tracking-wide opacity-80">
-                            {tasks?.length || 0} Tasks {isOwner ? '' : '(Shared)'}
+                            {displayTasks?.length || 0} Tasks {isOwner ? '' : '(Shared)'}
                         </p>
                     </div>
                 </div>
@@ -354,12 +408,12 @@ const ListDetailView = ({ list, onClose }: { list: List, onClose: () => void }) 
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
                  <div className="space-y-2">
-                     {tasks?.map(task => (
+                     {displayTasks?.map(task => (
                          <div key={task.id} className="flex items-center gap-3 py-3 border-b border-cozy-200 group">
                              <button onClick={() => toggleTask(task.id!)} className="text-cozy-400 hover:text-green-500 shrink-0">
                                  <Circle size={24} />
                              </button>
-                             <div className="flex-1 min-w-0">
+                             <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedTask(task)}>
                                  <span className="text-lg text-cozy-800 break-words block">{task.content}</span>
                              </div>
                              <button 
@@ -370,7 +424,7 @@ const ListDetailView = ({ list, onClose }: { list: List, onClose: () => void }) 
                              </button>
                          </div>
                      ))}
-                     {tasks?.length === 0 && (
+                     {displayTasks?.length === 0 && (
                          <div className="text-center text-cozy-400 py-10">
                              <CheckSquare size={48} className="mx-auto mb-2 opacity-50" />
                              <p>List is empty</p>
@@ -408,8 +462,16 @@ const ListDetailView = ({ list, onClose }: { list: List, onClose: () => void }) 
                 {showShareModal && (
                     <ShareListModal 
                         list={list} 
-                        tasks={tasks}
+                        // We share ALL tasks (including done) so sync works properly, 
+                        // otherwise checking an item done would not sync deletion to other user
+                        tasks={allListTasks}
                         onClose={() => setShowShareModal(false)}
+                    />
+                )}
+                {selectedTask && (
+                    <TaskDetailModal 
+                        task={selectedTask}
+                        onClose={() => setSelectedTask(null)}
                     />
                 )}
             </AnimatePresence>
@@ -678,48 +740,99 @@ export const Lists = () => {
     // Invite Handling
     const [searchParams, setSearchParams] = useSearchParams();
     const [inviteData, setInviteData] = useState<any | null>(null);
+    const [existingListForInvite, setExistingListForInvite] = useState<List | undefined>(undefined);
 
     useEffect(() => {
-        const inviteCode = searchParams.get('invite');
-        if (inviteCode) {
-            try {
-                const data = JSON.parse(safeAtob(inviteCode));
-                if (data && data.list) {
-                    setInviteData(data);
+        const checkInvite = async () => {
+            const inviteCode = searchParams.get('invite');
+            if (inviteCode) {
+                try {
+                    const data = JSON.parse(safeAtob(inviteCode));
+                    if (data && data.list) {
+                        setInviteData(data);
+                        // Check if we already have this list based on sharedId
+                        if (data.list.sharedId) {
+                            const found = await db.lists.where('sharedId').equals(data.list.sharedId).first();
+                            setExistingListForInvite(found);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Invalid invite code");
                 }
-            } catch (e) {
-                console.error("Invalid invite code");
             }
-        }
+        };
+        checkInvite();
     }, [searchParams]);
 
     const handleAcceptInvite = async () => {
         if (!inviteData) return;
         hapticImpact.success();
         
-        // Create List with EDITOR role
-        const listId = await db.lists.add({
-            name: inviteData.list.name,
-            color: inviteData.list.color,
-            createdAt: Date.now(),
-            role: 'editor' // Enforce role
-        });
+        let listId: number;
 
-        // Add Tasks
-        if (inviteData.tasks && inviteData.tasks.length > 0) {
-            const tasks = inviteData.tasks.map((t: any) => ({
-                ...t,
-                listId,
+        if (existingListForInvite && existingListForInvite.id) {
+            // MERGE logic
+            listId = existingListForInvite.id;
+            // Note: We don't overwrite name/color here to preserve local personalization
+        } else {
+            // NEW List logic
+            listId = await db.lists.add({
+                name: inviteData.list.name,
+                color: inviteData.list.color,
+                // Use sharedId from invite to enable future syncing
+                sharedId: inviteData.list.sharedId || crypto.randomUUID(),
                 createdAt: Date.now(),
-                // Reset status to INBOX unless specified, but for snapshot we usually keep as is or default to Inbox
-                // Let's keep status if it makes sense, or default to INBOX for new users
-                status: TaskStatus.INBOX 
-            }));
-            await db.tasks.bulkAdd(tasks);
+                role: 'editor' 
+            }) as number;
+        }
+
+        // --- SMART MERGE TASKS ---
+        if (inviteData.tasks && inviteData.tasks.length > 0) {
+            const incomingTasks = inviteData.tasks;
+            
+            for (const t of incomingTasks) {
+                // Try to find existing task by publicId (if available) or content
+                let existingTask;
+                if (t.publicId) {
+                    existingTask = await db.tasks.where('publicId').equals(t.publicId).first();
+                } else {
+                    // Fallback for legacy tasks without publicId (weak match)
+                    existingTask = await db.tasks.where({ listId, content: t.content }).first();
+                }
+
+                if (existingTask && existingTask.id) {
+                    // Update existing task
+                    await db.tasks.update(existingTask.id, {
+                        content: t.content,
+                        status: t.status, // Sync status (e.g. DONE)
+                        dueAt: t.dueAt,
+                        notes: t.notes
+                    });
+                } else {
+                    // Create new task
+                    await db.tasks.add({
+                        publicId: t.publicId || crypto.randomUUID(), // Ensure UUID
+                        content: t.content,
+                        listId,
+                        createdAt: Date.now(),
+                        status: t.status || TaskStatus.INBOX,
+                        dueAt: t.dueAt,
+                        notes: t.notes,
+                        source: 'share'
+                    });
+                }
+            }
         }
 
         setInviteData(null);
+        setExistingListForInvite(undefined);
         setSearchParams({}); // Clear URL
+
+        // Auto-open the list
+        const openedList = await db.lists.get(listId);
+        if (openedList) {
+            setActiveList(openedList);
+        }
     };
 
     return (
@@ -881,8 +994,9 @@ export const Lists = () => {
                 {inviteData && (
                     <AcceptInviteModal 
                         inviteData={inviteData} 
+                        existingList={existingListForInvite}
                         onAccept={handleAcceptInvite} 
-                        onCancel={() => { setInviteData(null); setSearchParams({}); }}
+                        onCancel={() => { setInviteData(null); setExistingListForInvite(undefined); setSearchParams({}); }}
                     />
                 )}
             </AnimatePresence>

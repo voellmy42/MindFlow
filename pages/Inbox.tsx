@@ -1,15 +1,18 @@
+
 import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
-import { TaskStatus } from '../types';
+import { TaskStatus, Task } from '../types';
 import { QuickCapture } from '../components/QuickCapture';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Circle, CheckCircle2, LogOut } from 'lucide-react';
 import { hapticImpact } from '../services/haptics';
 import { useAuth } from '../contexts/AuthContext';
+import { TaskDetailModal } from '../components/TaskDetailModal';
 
-const TaskItem: React.FC<{ task: any }> = ({ task }) => {
+const TaskItem: React.FC<{ task: any, onSelect: (t: Task) => void }> = ({ task, onSelect }) => {
   const handleComplete = (e: React.MouseEvent) => {
+      e.stopPropagation();
       hapticImpact.light();
       db.tasks.update(task.id, { status: TaskStatus.DONE });
   };
@@ -22,12 +25,14 @@ const TaskItem: React.FC<{ task: any }> = ({ task }) => {
       exit={{ opacity: 0, scale: 0.95 }}
       className="flex items-center gap-4 py-4 border-b border-cozy-100 group"
     >
-      <button onClick={handleComplete} className="text-cozy-300 hover:text-green-500 transition-colors">
+      <button onClick={handleComplete} className="text-cozy-300 hover:text-green-500 transition-colors shrink-0">
         <Circle size={24} />
       </button>
-      <span className="text-lg text-cozy-800 font-medium flex-1">{task.content}</span>
+      <div className="flex-1 cursor-pointer" onClick={() => onSelect(task)}>
+        <span className="text-lg text-cozy-800 font-medium block">{task.content}</span>
+      </div>
       {task.source === 'recipe' && (
-          <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-400 bg-indigo-50 px-2 py-1 rounded-full">
+          <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-400 bg-indigo-50 px-2 py-1 rounded-full shrink-0">
               Recipe
           </span>
       )}
@@ -38,6 +43,7 @@ const TaskItem: React.FC<{ task: any }> = ({ task }) => {
 export const Inbox = () => {
   const { user, logout } = useAuth();
   const [showProfile, setShowProfile] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const todayTasks = useLiveQuery(() => 
     db.tasks.where('status').equals(TaskStatus.TODAY).toArray()
@@ -113,13 +119,23 @@ export const Inbox = () => {
              </motion.div>
           ) : (
              todayTasks?.map(task => (
-                <TaskItem key={task.id} task={task} />
+                <TaskItem key={task.id} task={task} onSelect={setSelectedTask} />
              ))
           )}
         </AnimatePresence>
       </div>
 
       <QuickCapture />
+
+      <AnimatePresence>
+        {selectedTask && (
+            <TaskDetailModal 
+                key={selectedTask.id} 
+                task={selectedTask} 
+                onClose={() => setSelectedTask(null)} 
+            />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

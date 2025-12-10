@@ -1,11 +1,40 @@
-import React, { useState, useRef, useEffect } from 'react';
+
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Send, Mic, Sparkles, Loader2, X, StopCircle, Check, Trash2, Mic2 } from 'lucide-react';
+import { Send, Mic, Sparkles, Loader2, X, StopCircle, Check, Trash2, Mic2, CalendarDays } from 'lucide-react';
 import { db } from '../db';
 import { TaskStatus, StagingItem } from '../types';
 import { hapticImpact } from '../services/haptics';
 import { processVoiceMemo } from '../services/aiProcessor';
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion';
+
+// --- Helper: Date Parsing ---
+const parseDateKeywords = (text: string) => {
+    const lower = text.toLowerCase();
+    const now = new Date();
+    
+    // Check for "tomorrow"
+    if (/\btomorrow\b/.test(lower)) {
+        const d = new Date(now); d.setDate(d.getDate() + 1); d.setHours(12,0,0,0);
+        return { date: d, label: 'Tomorrow', status: TaskStatus.INBOX, cleanText: text.replace(/\btomorrow\b/i, '').trim() };
+    }
+    // Check for "today"
+    if (/\btoday\b/.test(lower)) {
+        const d = new Date(now); d.setHours(12,0,0,0);
+        return { date: d, label: 'Today', status: TaskStatus.TODAY, cleanText: text.replace(/\btoday\b/i, '').trim() };
+    }
+    // Check for "tonight"
+    if (/\btonight\b/.test(lower)) {
+        const d = new Date(now); d.setHours(19,0,0,0); // 7 PM
+        return { date: d, label: 'Tonight', status: TaskStatus.TODAY, cleanText: text.replace(/\btonight\b/i, '').trim() };
+    }
+    // Check for "next week"
+    if (/\bnext week\b/.test(lower)) {
+        const d = new Date(now); d.setDate(d.getDate() + 7); d.setHours(12,0,0,0);
+        return { date: d, label: 'Next Week', status: TaskStatus.INBOX, cleanText: text.replace(/\bnext week\b/i, '').trim() };
+    }
+    return null;
+};
 
 // --- Review Card Component ---
 const ReviewCard = ({ task, index, onSwipe }: { task: any, index: number, onSwipe: (dir: 'left' | 'right') => void }) => {
@@ -75,14 +104,23 @@ export const QuickCapture = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
+  // --- Smart Parsing State ---
+  const detectedDate = useMemo(() => parseDateKeywords(input), [input]);
+
   // --- Manual Text Submit ---
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
     hapticImpact.success();
+
+    const taskContent = detectedDate ? detectedDate.cleanText : input;
+    const taskStatus = detectedDate ? detectedDate.status : TaskStatus.INBOX;
+    const taskDueAt = detectedDate ? detectedDate.date.getTime() : undefined;
+
     await db.tasks.add({
-      content: input,
-      status: TaskStatus.INBOX,
+      content: taskContent,
+      status: taskStatus,
+      dueAt: taskDueAt,
       createdAt: Date.now(),
       source: 'manual',
     });
@@ -258,6 +296,21 @@ export const QuickCapture = () => {
   // 3. Default Idle Bar
   return (
     <div className={`fixed bottom-24 left-0 right-0 px-4 z-40 transition-all duration-300`}>
+      {/* Smart Date Indicator */}
+      <AnimatePresence>
+        {detectedDate && (
+             <motion.div 
+                initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                className="absolute -top-10 left-4 bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg flex items-center gap-2 z-10"
+             >
+                <CalendarDays size={14} className="text-indigo-200" />
+                {detectedDate.label}
+             </motion.div>
+        )}
+      </AnimatePresence>
+
       <form 
         onSubmit={handleManualSubmit}
         className="relative flex items-center bg-white shadow-2xl rounded-2xl overflow-hidden border border-cozy-200"

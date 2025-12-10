@@ -9,15 +9,18 @@ export enum TaskStatus {
 
 export interface List {
   id?: number;
+  sharedId?: string; // Unique UUID for syncing across devices
   name: string;
   color: string;
   icon?: string; // e.g. emoji
   createdAt: number;
   role?: 'owner' | 'editor'; // 'owner' can delete list, 'editor' can only edit content
+  lastSyncedAt?: number;
 }
 
 export interface Task {
   id?: number;
+  publicId?: string; // Unique UUID for syncing items across devices
   content: string;
   status: TaskStatus;
   createdAt: number;
