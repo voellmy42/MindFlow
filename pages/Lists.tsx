@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { db } from '../db';
 import { Recipe, TaskStatus, List, Task } from '../types';
 import { hapticImpact } from '../services/haptics';
-import { Plus, X, Trash2, Calendar, Check, ArrowRight, Play, CheckSquare, Zap, ChevronLeft, Circle, Send, Share2, Users, Copy, CheckCircle, Link as LinkIcon } from 'lucide-react';
+import { Plus, X, Trash2, Calendar, Check, ArrowRight, Play, CheckSquare, Zap, ChevronLeft, Circle, Send, Share2, Users, Copy, CheckCircle, Link as LinkIcon, LayoutGrid, StretchHorizontal } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // --- Constants ---
@@ -663,6 +663,7 @@ const RunRecipeModal = ({ recipe, onClose }: { recipe: Recipe; onClose: () => vo
 
 export const Lists = () => {
     const [tab, setTab] = useState<'lists' | 'recipes'>('lists');
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     
     // Data
     const lists = useLiveQuery(() => db.lists.toArray());
@@ -743,40 +744,74 @@ export const Lists = () => {
                     Recipes
                 </button>
             </div>
+            
+            {/* View Toggle - Visible for both tabs */}
+            <div className="flex justify-end mb-4 px-1">
+                 <div className="bg-cozy-100 p-1 rounded-xl flex gap-1">
+                     <button 
+                        onClick={() => { setViewMode('list'); hapticImpact.light(); }}
+                        className={`p-1.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-cozy-900' : 'text-cozy-400 hover:text-cozy-600'}`}
+                     >
+                        <StretchHorizontal size={18} />
+                     </button>
+                     <button 
+                        onClick={() => { setViewMode('grid'); hapticImpact.light(); }}
+                        className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-cozy-900' : 'text-cozy-400 hover:text-cozy-600'}`}
+                     >
+                        <LayoutGrid size={18} />
+                     </button>
+                 </div>
+            </div>
 
             {/* Content - Lists */}
             {tab === 'lists' && (
-                <div className="flex-1">
-                     <div className="grid grid-cols-2 gap-4">
+                <div className="flex-1 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                     <div className={`grid ${viewMode === 'grid' ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
                         {lists?.map(list => (
                             <motion.button
+                                layout
                                 key={list.id}
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => setActiveList(list)}
-                                className={`aspect-square rounded-3xl ${list.color || 'bg-cozy-100'} p-6 flex flex-col justify-between text-left shadow-sm border border-black/5 relative overflow-hidden group`}
+                                className={`rounded-3xl ${list.color || 'bg-cozy-100'} shadow-sm border border-black/5 relative overflow-hidden group transition-all ${viewMode === 'grid' ? 'aspect-square p-6 flex flex-col justify-between text-left' : 'h-20 px-5 flex flex-row items-center gap-4 text-left'}`}
                             >
-                                <div className="absolute top-4 right-4 opacity-50">
-                                    <ChevronLeft size={24} className="rotate-180 text-cozy-900" />
-                                </div>
-                                <div className="flex-1">
-                                    {list.role === 'editor' && (
-                                        <Users size={20} className="text-cozy-900 opacity-20" />
-                                    )}
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-bold text-cozy-900 leading-tight mb-1">{list.name}</h3>
-                                </div>
+                                {viewMode === 'grid' ? (
+                                    <>
+                                        <div className="absolute top-4 right-4 opacity-50">
+                                            <ChevronLeft size={24} className="rotate-180 text-cozy-900" />
+                                        </div>
+                                        <div className="flex-1">
+                                            {list.role === 'editor' && (
+                                                <Users size={20} className="text-cozy-900 opacity-20" />
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-bold text-cozy-900 leading-tight mb-1">{list.name}</h3>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="shrink-0">
+                                            {list.role === 'editor' ? <Users size={20} className="text-cozy-900/50" /> : <div className="w-5" />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="text-lg font-bold text-cozy-900 leading-tight truncate">{list.name}</h3>
+                                        </div>
+                                        <ChevronLeft size={20} className="rotate-180 text-cozy-900/30" />
+                                    </>
+                                )}
                             </motion.button>
                         ))}
                         
                         {/* Add List Button */}
                         <motion.button
+                            layout
                             whileTap={{ scale: 0.95 }}
                             onClick={() => setIsCreatingList(true)}
-                            className="aspect-square rounded-3xl border-2 border-dashed border-cozy-200 flex flex-col items-center justify-center text-cozy-300 hover:text-cozy-500 hover:border-cozy-300 transition-colors"
+                            className={`rounded-3xl border-2 border-dashed border-cozy-200 flex items-center justify-center text-cozy-300 hover:text-cozy-500 hover:border-cozy-300 transition-colors ${viewMode === 'grid' ? 'aspect-square flex-col' : 'h-20 flex-row gap-2'}`}
                         >
-                            <Plus size={32} />
-                            <span className="font-bold text-sm mt-2">New List</span>
+                            <Plus size={viewMode === 'grid' ? 32 : 24} />
+                            <span className="font-bold text-sm">New List</span>
                         </motion.button>
                      </div>
                 </div>
@@ -784,38 +819,55 @@ export const Lists = () => {
 
             {/* Content - Recipes */}
             {tab === 'recipes' && (
-                <div className="flex-1">
-                    <div className="grid grid-cols-2 gap-4">
+                <div className="flex-1 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className={`grid ${viewMode === 'grid' ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
                         {recipes?.map(recipe => (
                         <motion.button
+                            layout
                             key={recipe.id}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => setActiveRecipe(recipe)}
-                            className={`aspect-square rounded-3xl ${recipe.color || 'bg-cozy-100'} p-6 flex flex-col justify-between text-left shadow-sm border border-black/5 relative overflow-hidden group`}
+                            className={`rounded-3xl ${recipe.color || 'bg-cozy-100'} shadow-sm border border-black/5 relative overflow-hidden group transition-all ${viewMode === 'grid' ? 'aspect-square p-6 flex flex-col justify-between text-left' : 'h-20 px-5 flex flex-row items-center gap-4 text-left'}`}
                         >
-                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-50 transition-opacity">
-                                <Play size={24} className="text-cozy-900" />
-                            </div>
-                            
-                            <div className="flex-1">
-                                <Zap size={24} className="text-cozy-900 opacity-20" />
-                            </div>
-                            
-                            <div>
-                                <h3 className="text-xl font-bold text-cozy-900 leading-tight mb-1">{recipe.name}</h3>
-                                <p className="text-cozy-900/60 text-xs font-bold uppercase tracking-wider">{recipe.taskTemplates.length} Tasks</p>
-                            </div>
+                            {viewMode === 'grid' ? (
+                                <>
+                                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-50 transition-opacity">
+                                        <Play size={24} className="text-cozy-900" />
+                                    </div>
+                                    
+                                    <div className="flex-1">
+                                        <Zap size={24} className="text-cozy-900 opacity-20" />
+                                    </div>
+                                    
+                                    <div>
+                                        <h3 className="text-xl font-bold text-cozy-900 leading-tight mb-1">{recipe.name}</h3>
+                                        <p className="text-cozy-900/60 text-xs font-bold uppercase tracking-wider">{recipe.taskTemplates.length} Tasks</p>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="shrink-0">
+                                        <Zap size={20} className="text-cozy-900/50" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="text-lg font-bold text-cozy-900 leading-tight truncate">{recipe.name}</h3>
+                                        <p className="text-cozy-900/60 text-[10px] font-bold uppercase tracking-wider">{recipe.taskTemplates.length} Tasks</p>
+                                    </div>
+                                    <Play size={20} className="text-cozy-900/30" />
+                                </>
+                            )}
                         </motion.button>
                         ))}
 
                          {/* Add Recipe Button */}
                          <motion.button
+                            layout
                             whileTap={{ scale: 0.95 }}
                             onClick={() => setIsCreatingRecipe(true)}
-                            className="aspect-square rounded-3xl border-2 border-dashed border-cozy-200 flex flex-col items-center justify-center text-cozy-300 hover:text-cozy-500 hover:border-cozy-300 transition-colors"
+                            className={`rounded-3xl border-2 border-dashed border-cozy-200 flex items-center justify-center text-cozy-300 hover:text-cozy-500 hover:border-cozy-300 transition-colors ${viewMode === 'grid' ? 'aspect-square flex-col' : 'h-20 flex-row gap-2'}`}
                         >
-                            <Plus size={32} />
-                            <span className="font-bold text-sm mt-2">New Recipe</span>
+                            <Plus size={viewMode === 'grid' ? 32 : 24} />
+                            <span className="font-bold text-sm">New Recipe</span>
                         </motion.button>
                     </div>
                 </div>
