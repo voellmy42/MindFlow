@@ -9,42 +9,53 @@ import { AllTasks } from './pages/AllTasks';
 import { Login } from './pages/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
-import { db } from './db';
+import { db } from './lib/firebase'; // Firestore
+import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { TaskStatus } from './types';
 import { hapticImpact } from './services/haptics';
 
 // --- Wake Up Service ---
 // Checks for tasks that were snoozed or scheduled for the past/today and moves them to TODAY status
 const WakeUpService = () => {
+  const { user } = useAuth();
+  
   useEffect(() => {
+    if (!user) return;
+
     const checkAndPromoteTasks = async () => {
       const now = Date.now();
-      // Find tasks that are SNOOZED but due before or right now
-      // OR tasks in INBOX that have a due date passed (optional, but good for cleanup)
       
-      const tasksToWake = await db.tasks
-        .where('status')
-        .equals(TaskStatus.SNOOZED)
-        .and(task => !!task.dueAt && task.dueAt <= now)
-        .toArray();
+      // Query tasks that are SNOOZED and due <= now
+      const q = query(
+          collection(db, 'tasks'),
+          where('status', '==', TaskStatus.SNOOZED),
+          where('dueAt', '<=', now)
+      );
 
-      if (tasksToWake.length > 0) {
-        console.log(`Waking up ${tasksToWake.length} tasks`);
-        await db.tasks.bulkUpdate(
-          tasksToWake.map(t => ({
-            key: t.id!,
-            changes: { status: TaskStatus.TODAY }
-          }))
-        );
-        hapticImpact.medium(); // Subtle nudge that things changed
+      const snapshot = await getDocs(q);
+      
+      if (!snapshot.empty) {
+        const batch = writeBatch(db);
+        let count = 0;
+        
+        snapshot.forEach(t => {
+           // Double check ownership or permissions in real app, but query implicitly implies visibility if rules set
+           batch.update(doc(db, 'tasks', t.id), { status: TaskStatus.TODAY });
+           count++;
+        });
+
+        await batch.commit();
+        if (count > 0) {
+            console.log(`Waking up ${count} tasks`);
+            hapticImpact.medium();
+        }
       }
     };
 
     checkAndPromoteTasks();
-    // Run every minute if the app stays open
     const interval = setInterval(checkAndPromoteTasks, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   return null;
 };

@@ -1,23 +1,27 @@
 
+
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../db';
 import { Task, TaskStatus } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Circle, CalendarDays, User, AlignLeft } from 'lucide-react';
 import { hapticImpact } from '../services/haptics';
 import { TaskDetailModal } from '../components/TaskDetailModal';
+import { useTasks, useLists } from '../hooks/useFireStore'; // IMPORT FIRESTORE
+import { db } from '../lib/firebase';
+import { updateDoc, doc } from 'firebase/firestore';
 
 // --- Task Item ---
-const TaskItem: React.FC<{ task: Task; onSelect: (t: Task) => void }> = ({ task, onSelect }) => {
+const TaskItem: React.FC<{ task: Task; lists: any[]; onSelect: (t: Task) => void }> = ({ task, lists, onSelect }) => {
   const handleComplete = (e: React.MouseEvent) => {
     e.stopPropagation();
     hapticImpact.light();
-    db.tasks.update(task.id, { status: TaskStatus.DONE });
+    if (task.id) {
+      updateDoc(doc(db, 'tasks', String(task.id)), { status: TaskStatus.DONE });
+    }
   };
   
-  // Fetch list name if exists
-  const list = useLiveQuery(() => task.listId ? db.lists.get(task.listId) : Promise.resolve(undefined), [task.listId]);
+  // Find list name if exists
+  const list = task.listId ? lists.find(l => l.id === task.listId) : undefined;
 
   return (
     <motion.div
@@ -50,18 +54,13 @@ const TaskItem: React.FC<{ task: Task; onSelect: (t: Task) => void }> = ({ task,
                      <User size={12} /> {task.responsible}
                  </span>
              )}
-             {task.notes && (
-                 <span className="text-[11px] text-cozy-400 flex items-center gap-1 py-1">
-                     <AlignLeft size={12} />
-                 </span>
-             )}
           </div>
       </div>
     </motion.div>
   );
 };
 
-const Section = ({ title, tasks, color = "text-cozy-900", onTaskSelect }: { title: string; tasks: Task[]; color?: string; onTaskSelect: (t: Task) => void }) => {
+const Section = ({ title, tasks, lists, color = "text-cozy-900", onTaskSelect }: { title: string; tasks: Task[]; lists: any[]; color?: string; onTaskSelect: (t: Task) => void }) => {
   if (!tasks || tasks.length === 0) return null;
   
   return (
@@ -72,7 +71,7 @@ const Section = ({ title, tasks, color = "text-cozy-900", onTaskSelect }: { titl
       </h3>
       <div className="bg-white rounded-3xl shadow-sm border border-cozy-100 px-6 py-2">
         {tasks.map(task => (
-          <TaskItem key={task.id} task={task} onSelect={onTaskSelect} />
+          <TaskItem key={task.id} task={task} lists={lists} onSelect={onTaskSelect} />
         ))}
       </div>
     </div>
@@ -80,16 +79,16 @@ const Section = ({ title, tasks, color = "text-cozy-900", onTaskSelect }: { titl
 };
 
 export const AllTasks = () => {
-  const allTasks = useLiveQuery(() => 
-    db.tasks
-      .where('status')
-      .noneOf([TaskStatus.DELETED, TaskStatus.DONE])
-      .toArray()
-  );
+  // Fetch ALL tasks (we'll filter status locally for buckets)
+  const { tasks: allTasks } = useTasks({ excludeDeleted: true });
+  const { lists } = useLists(); // Need lists for labels
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   if (!allTasks) return <div className="p-10 text-center text-cozy-400">Loading...</div>;
+
+  // Filter out DONE tasks for Agenda view
+  const activeTasks = allTasks.filter(t => t.status !== TaskStatus.DONE);
 
   // Grouping Logic
   const now = new Date();
@@ -112,7 +111,7 @@ export const AllTasks = () => {
     noDate: [] as Task[],
   };
 
-  allTasks.forEach(task => {
+  activeTasks.forEach(task => {
     if (task.status === TaskStatus.TODAY) {
       buckets.today.push(task);
       return;
@@ -151,24 +150,13 @@ export const AllTasks = () => {
 
       <div className="px-4">
         <AnimatePresence>
-            <Section title="Overdue" tasks={buckets.overdue} color="text-rose-600" onTaskSelect={setSelectedTask} />
-            <Section title="Today" tasks={buckets.today} color="text-indigo-600" onTaskSelect={setSelectedTask} />
-            <Section title="Tomorrow" tasks={buckets.tomorrow} onTaskSelect={setSelectedTask} />
-            <Section title="Later This Week" tasks={buckets.laterThisWeek} onTaskSelect={setSelectedTask} />
-            <Section title="Next Week" tasks={buckets.nextWeek} onTaskSelect={setSelectedTask} />
-            <Section title="Later" tasks={buckets.later} onTaskSelect={setSelectedTask} />
-            <Section title="No Due Date" tasks={buckets.noDate} color="text-cozy-500" onTaskSelect={setSelectedTask} />
-
-            {allTasks.length === 0 && (
-                <motion.div 
-                    initial={{ opacity: 0 }} 
-                    animate={{ opacity: 1 }}
-                    className="flex flex-col items-center justify-center py-20 text-cozy-400"
-                >
-                    <CalendarDays size={48} className="mb-4 text-cozy-300" />
-                    <p>No active tasks found.</p>
-                </motion.div>
-            )}
+            <Section title="Overdue" tasks={buckets.overdue} lists={lists} color="text-rose-600" onTaskSelect={setSelectedTask} />
+            <Section title="Today" tasks={buckets.today} lists={lists} color="text-indigo-600" onTaskSelect={setSelectedTask} />
+            <Section title="Tomorrow" tasks={buckets.tomorrow} lists={lists} onTaskSelect={setSelectedTask} />
+            <Section title="Later This Week" tasks={buckets.laterThisWeek} lists={lists} onTaskSelect={setSelectedTask} />
+            <Section title="Next Week" tasks={buckets.nextWeek} lists={lists} onTaskSelect={setSelectedTask} />
+            <Section title="Later" tasks={buckets.later} lists={lists} onTaskSelect={setSelectedTask} />
+            <Section title="No Due Date" tasks={buckets.noDate} lists={lists} color="text-cozy-500" onTaskSelect={setSelectedTask} />
         </AnimatePresence>
       </div>
 

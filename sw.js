@@ -1,9 +1,9 @@
 
-const CACHE_NAME = 'mindflow-v2';
+const CACHE_NAME = 'mindflow-v7';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json',
+  './',
+  './index.html',
+  './manifest.json',
   'https://cdn.tailwindcss.com',
   'https://aistudiocdn.com/dexie@^4.2.1',
   'https://aistudiocdn.com/framer-motion@^12.23.26',
@@ -44,7 +44,7 @@ self.addEventListener('fetch', (event) => {
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
-        .catch(() => caches.match('/index.html'))
+        .catch(() => caches.match('./index.html'))
     );
     return;
   }

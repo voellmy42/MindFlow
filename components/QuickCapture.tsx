@@ -1,12 +1,13 @@
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { Send, Mic, Sparkles, Loader2, X, StopCircle, Check, Trash2, Mic2, CalendarDays } from 'lucide-react';
-import { db } from '../db';
-import { TaskStatus, StagingItem } from '../types';
+import { Send, Mic, Sparkles, X, StopCircle, Check, Trash2, Mic2, CalendarDays } from 'lucide-react';
+import { TaskStatus } from '../types';
 import { hapticImpact } from '../services/haptics';
 import { processVoiceMemo } from '../services/aiProcessor';
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion';
+import { useTasks } from '../hooks/useFireStore';
+import { db } from '../db'; // Keep dexie for staging/offline-voice processing if needed, or remove.
+// For now, we'll keep staging in Dexie as it's temporary state, but push "Keep" to Firestore.
+import { useLiveQuery } from 'dexie-react-hooks';
 
 // --- Helper: Date Parsing ---
 const parseDateKeywords = (text: string) => {
@@ -37,7 +38,13 @@ const parseDateKeywords = (text: string) => {
 };
 
 // --- Review Card Component ---
-const ReviewCard = ({ task, index, onSwipe }: { task: any, index: number, onSwipe: (dir: 'left' | 'right') => void }) => {
+interface ReviewCardProps {
+    task: any;
+    index: number;
+    onSwipe: (dir: 'left' | 'right') => void;
+}
+
+const ReviewCard: React.FC<ReviewCardProps> = ({ task, index, onSwipe }) => {
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-150, 0, 150], [-15, 0, 15]);
   const opacity = useTransform(x, [-200, -150, 0, 150, 200], [0, 1, 1, 1, 0]);
@@ -85,13 +92,14 @@ export const QuickCapture = () => {
   const [isListening, setIsListening] = useState(false);
   const [input, setInput] = useState('');
   
-  // Watch the staging table for results from the background worker
+  // Hook for Firestore Actions
+  const { addTask } = useTasks();
+
+  // Keep Staging in Dexie for now (it's temporary buffer)
   const stagingItems = useLiveQuery(() => db.staging.toArray());
-  const currentStagingItem = stagingItems?.[0]; // Process one batch at a time
-  
+  const currentStagingItem = stagingItems?.[0]; 
   const [localTasks, setLocalTasks] = useState<any[]>([]);
 
-  // Sync local tasks with DB when a new staging item appears
   useEffect(() => {
     if (currentStagingItem) {
         setLocalTasks(currentStagingItem.tasks);
@@ -104,7 +112,6 @@ export const QuickCapture = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // --- Smart Parsing State ---
   const detectedDate = useMemo(() => parseDateKeywords(input), [input]);
 
   // --- Manual Text Submit ---
@@ -117,17 +124,17 @@ export const QuickCapture = () => {
     const taskStatus = detectedDate ? detectedDate.status : TaskStatus.INBOX;
     const taskDueAt = detectedDate ? detectedDate.date.getTime() : undefined;
 
-    await db.tasks.add({
+    // FIRESTORE WRITE
+    await addTask({
       content: taskContent,
       status: taskStatus,
       dueAt: taskDueAt,
-      createdAt: Date.now(),
       source: 'manual',
     });
     setInput('');
   };
 
-  // --- Voice Logic ---
+  // --- Voice Logic (Unchanged except logic flow) ---
   const toggleListening = async () => {
     if (isListening) {
       stopListening();
@@ -141,34 +148,21 @@ export const QuickCapture = () => {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const recorder = new MediaRecorder(stream);
         audioChunksRef.current = [];
-
         recorder.ondataavailable = (e) => {
             if (e.data.size > 0) audioChunksRef.current.push(e.data);
         };
-
         recorder.onstop = () => {
             const mimeType = recorder.mimeType || 'audio/webm';
             const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
             stream.getTracks().forEach(t => t.stop());
-            
-            // Fire and forget - processing happens in background
-            // We pass current localTasks if we are in refinement mode
             const context = currentStagingItem ? localTasks : [];
             processVoiceMemo(audioBlob, context);
-            
             hapticImpact.success();
         };
-
         recorder.start();
         mediaRecorderRef.current = recorder;
         setIsListening(true);
         hapticImpact.medium();
-        
-        // Request notification permission early
-        if (Notification.permission === 'default') {
-            Notification.requestPermission();
-        }
-
     } catch (error) {
         console.error("Microphone access denied:", error);
         alert("Microphone access required.");
@@ -189,14 +183,14 @@ export const QuickCapture = () => {
       
       if (direction === 'right') {
           hapticImpact.success();
-          await db.tasks.add({
+          // FIRESTORE WRITE
+          await addTask({
               content: currentTask.content,
               status: currentTask.dueAt ? TaskStatus.TODAY : TaskStatus.INBOX,
               dueAt: currentTask.dueAt,
               responsible: currentTask.responsible,
               notes: currentTask.notes,
-              createdAt: Date.now(),
-              source: 'recipe'
+              source: 'recipe' // or voice
           });
       } else {
           hapticImpact.light();
@@ -205,7 +199,6 @@ export const QuickCapture = () => {
       const newStack = localTasks.slice(1);
       setLocalTasks(newStack);
 
-      // If stack empty, delete the staging item to close the modal
       if (newStack.length === 0 && currentStagingItem?.id) {
           await db.staging.delete(currentStagingItem.id);
       }
@@ -217,9 +210,8 @@ export const QuickCapture = () => {
       }
   };
 
-  // --- RENDER ---
-
-  // 1. Review Mode (Active if Staging Item exists)
+  // ... (Render Logic remains largely same, just using new handlers)
+  
   if (currentStagingItem) {
        return (
           <div className="fixed inset-0 z-50 bg-white/95 backdrop-blur-xl flex flex-col pt-20 pb-8 px-6 animate-in fade-in duration-300">
@@ -252,16 +244,10 @@ export const QuickCapture = () => {
              </div>
 
              <div className="mt-8 flex items-center justify-center gap-6">
-                 <button 
-                    onClick={handleCloseReview}
-                    className="p-4 rounded-full bg-cozy-100 text-cozy-600 hover:bg-cozy-200 transition-colors"
-                 >
+                 <button onClick={handleCloseReview} className="p-4 rounded-full bg-cozy-100 text-cozy-600 hover:bg-cozy-200 transition-colors">
                      <X size={24} />
                  </button>
-                 <button 
-                    onClick={toggleListening}
-                    className="p-6 rounded-full bg-indigo-600 text-white shadow-xl shadow-indigo-200 active:scale-90 transition-transform"
-                 >
+                 <button onClick={toggleListening} className="p-6 rounded-full bg-indigo-600 text-white shadow-xl shadow-indigo-200 active:scale-90 transition-transform">
                     <Mic2 size={32} />
                  </button>
              </div>
@@ -269,7 +255,6 @@ export const QuickCapture = () => {
       );
   }
 
-  // 2. Listening Mode Overlay
   if (isListening) {
       return (
           <div className="fixed inset-0 z-50 bg-indigo-600/90 backdrop-blur-md flex flex-col items-center justify-center text-white animate-in fade-in duration-200">
@@ -283,20 +268,15 @@ export const QuickCapture = () => {
               <h2 className="text-2xl font-bold mb-2">Listening...</h2>
               <p className="text-white/70">Tap stop to analyze in background.</p>
               
-              <button 
-                onClick={toggleListening}
-                className="mt-12 p-4 bg-white text-indigo-600 rounded-full shadow-lg active:scale-95 transition-transform"
-              >
+              <button onClick={toggleListening} className="mt-12 p-4 bg-white text-indigo-600 rounded-full shadow-lg active:scale-95 transition-transform">
                   <StopCircle size={32} />
               </button>
           </div>
       );
   }
 
-  // 3. Default Idle Bar
   return (
     <div className={`fixed bottom-24 left-0 right-0 px-4 z-40 transition-all duration-300`}>
-      {/* Smart Date Indicator */}
       <AnimatePresence>
         {detectedDate && (
              <motion.div 
@@ -315,11 +295,7 @@ export const QuickCapture = () => {
         onSubmit={handleManualSubmit}
         className="relative flex items-center bg-white shadow-2xl rounded-2xl overflow-hidden border border-cozy-200"
       >
-        <button
-            type="button"
-            onClick={toggleListening}
-            className="p-4 text-indigo-600 hover:bg-indigo-50 transition-colors border-r border-cozy-100"
-        >
+        <button type="button" onClick={toggleListening} className="p-4 text-indigo-600 hover:bg-indigo-50 transition-colors border-r border-cozy-100">
             <Mic size={20} />
         </button>
 
@@ -333,10 +309,7 @@ export const QuickCapture = () => {
 
         <div className="absolute right-2">
             {input ? (
-                <button
-                type="submit"
-                className="p-2 bg-cozy-900 text-white rounded-xl active:scale-90 transition-all shadow-md"
-                >
+                <button type="submit" className="p-2 bg-cozy-900 text-white rounded-xl active:scale-90 transition-all shadow-md">
                 <Send size={20} />
                 </button>
             ) : null}

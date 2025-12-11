@@ -169,7 +169,7 @@ const RunRecipeModal = ({ recipe, onClose }: { recipe: Recipe; onClose: () => vo
       let content = tmpl;
       // Replace variables
       Object.entries(varValues).forEach(([key, val]) => {
-          content = content.replace(new RegExp(`{${key}}`, 'g'), val);
+          content = content.replace(new RegExp(`{${key}}`, 'g'), String(val));
       });
       return {
         content,

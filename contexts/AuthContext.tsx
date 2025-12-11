@@ -1,4 +1,7 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { auth, googleProvider } from '../lib/firebase';
+import { signInWithPopup, signOut, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { hapticImpact } from '../services/haptics';
 
 interface User {
@@ -12,74 +15,78 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  loginWithGoogle: (credential: string) => void;
-  logout: () => void;
-  continueAsGuest: () => void;
+  loginWithGoogle: () => Promise<void>;
+  logout: () => Promise<void>;
+  continueAsGuest: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Helper to decode JWT without external library
-function parseJwt (token: string) {
-    var base64Url = token.split('.')[1];
-    var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    var jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
-        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-
-    return JSON.parse(jsonPayload);
-}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check local storage for existing session
-    const storedUser = localStorage.getItem('mindflow_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+    let mounted = true;
+
+    // Safety Timeout: If Firebase doesn't respond in 4 seconds, stop loading so user sees Login screen.
+    const timeoutTimer = setTimeout(() => {
+        if (mounted && isLoading) {
+            console.warn("Auth check timed out. Defaulting to logged out state.");
+            setIsLoading(false);
+        }
+    }, 4000);
+
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (!mounted) return;
+      
+      // Clear safety timer as we got a response
+      clearTimeout(timeoutTimer);
+
+      if (firebaseUser) {
+        setUser({
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || 'Guest',
+          email: firebaseUser.email || '',
+          avatar: firebaseUser.photoURL || `https://api.dicebear.com/7.x/notionists/svg?seed=${firebaseUser.uid}`
+        });
+      } else {
+        setUser(null);
+      }
+      setIsLoading(false);
+    });
+
+    return () => {
+        mounted = false;
+        clearTimeout(timeoutTimer);
+        unsubscribe();
+    };
   }, []);
 
-  const loginWithGoogle = (credential: string) => {
+  const loginWithGoogle = async () => {
     try {
-        const payload = parseJwt(credential);
-        
-        const googleUser: User = {
-            id: payload.sub, // Google unique ID
-            name: payload.name,
-            email: payload.email,
-            avatar: payload.picture
-        };
-
-        setUser(googleUser);
-        localStorage.setItem('mindflow_user', JSON.stringify(googleUser));
+        await signInWithPopup(auth, googleProvider);
         hapticImpact.success();
-    } catch (e) {
-        console.error("Failed to parse Google token", e);
+    } catch (error: any) {
+        console.error("Login failed", error);
         hapticImpact.error();
+        throw error;
     }
   };
 
-  const continueAsGuest = () => {
-     const guestUser: User = {
-         id: 'guest',
-         name: 'Guest',
-         email: '',
-         avatar: 'https://api.dicebear.com/7.x/notionists/svg?seed=guest'
-     };
-     setUser(guestUser);
-     localStorage.setItem('mindflow_user', JSON.stringify(guestUser));
-     hapticImpact.light();
+  const continueAsGuest = async () => {
+     try {
+         await signInAnonymously(auth);
+         hapticImpact.light();
+     } catch (error) {
+         console.error("Guest login failed", error);
+         throw error;
+     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     hapticImpact.medium();
-    setUser(null);
-    localStorage.removeItem('mindflow_user');
-    // Also revoke google token if needed, but for local-first PWA, clearing local state is usually sufficient for UI
+    await signOut(auth);
   };
 
   return (

@@ -1,4 +1,5 @@
 
+
 export enum TaskStatus {
   INBOX = 'INBOX',
   TODAY = 'TODAY',
@@ -8,7 +9,7 @@ export enum TaskStatus {
 }
 
 export interface List {
-  id?: number;
+  id?: string | number;
   sharedId?: string; // Unique UUID for syncing across devices
   name: string;
   color: string;
@@ -19,7 +20,7 @@ export interface List {
 }
 
 export interface Task {
-  id?: number;
+  id?: string | number;
   publicId?: string; // Unique UUID for syncing items across devices
   content: string;
   status: TaskStatus;
@@ -29,11 +30,11 @@ export interface Task {
   responsible?: string;
   notes?: string;
   ownerId?: string; // For syncing/sharing
-  listId?: number; // Link to a List
+  listId?: string | number; // Link to a List
 }
 
 export interface Recipe {
-  id?: number;
+  id?: string | number;
   name: string;
   template: string; // e.g., "Pack for {days} days to {location}"
   taskTemplates: string[]; // e.g., ["Buy ticket to {location}", "Pack {days} pairs of socks"]
@@ -42,7 +43,7 @@ export interface Recipe {
 }
 
 export interface StagingItem {
-  id?: number;
+  id?: string | number;
   createdAt: number;
   summary: string;
   tasks: Array<{

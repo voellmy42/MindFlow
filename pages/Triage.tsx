@@ -1,17 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+
+import React from 'react';
 import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from 'framer-motion';
-import { db } from '../db';
 import { Task, TaskStatus } from '../types';
 import { hapticImpact } from '../services/haptics';
-import { Check, Clock, Trash2, ArrowRight } from 'lucide-react';
+import { Check, Clock, Trash2 } from 'lucide-react';
+import { useTasks } from '../hooks/useFireStore'; // IMPORT FIRESTORE
 
 const Card: React.FC<{ task: Task; onSwipe: (dir: 'left' | 'right' | 'down') => void }> = ({ task, onSwipe }) => {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotate = useTransform(x, [-150, 0, 150], [-15, 0, 15]);
   
-  // Background colors based on drag direction
   const rightOpacity = useTransform(x, [0, 100], [0, 1]);
   const leftOpacity = useTransform(x, [0, -100], [0, 1]);
   const downOpacity = useTransform(y, [0, 100], [0, 1]);
@@ -36,7 +35,6 @@ const Card: React.FC<{ task: Task; onSwipe: (dir: 'left' | 'right' | 'down') => 
       whileTap={{ scale: 1.05, cursor: 'grabbing' }}
       className="absolute top-0 w-full h-full max-h-[60vh] aspect-[3/4] bg-white rounded-3xl shadow-xl border border-cozy-100 flex flex-col items-center justify-center p-8 select-none cursor-grab overflow-hidden"
     >
-        {/* Swipe Indicators Overlay */}
         <motion.div style={{ opacity: rightOpacity }} className="absolute inset-0 bg-green-500/20 pointer-events-none flex items-center justify-center">
             <Check size={80} className="text-green-600 translate-x-12" />
         </motion.div>
@@ -58,11 +56,10 @@ const Card: React.FC<{ task: Task; onSwipe: (dir: 'left' | 'right' | 'down') => 
 };
 
 export const Triage = () => {
-  const inboxTasks = useLiveQuery(() => 
-    db.tasks.where('status').equals(TaskStatus.INBOX).reverse().toArray()
-  );
+  // Use Firestore Hook
+  const { tasks: inboxTasks, updateTask } = useTasks({ status: TaskStatus.INBOX, excludeDeleted: true });
 
-  const handleSwipe = async (id: number, direction: 'left' | 'right' | 'down') => {
+  const handleSwipe = async (id: any, direction: 'left' | 'right' | 'down') => {
     hapticImpact.medium();
     
     let newStatus = TaskStatus.INBOX;
@@ -83,7 +80,8 @@ export const Triage = () => {
         break;
     }
 
-    await db.tasks.update(id, { status: newStatus, dueAt });
+    // Firestore Update
+    if (id) await updateTask(id, { status: newStatus, dueAt });
   };
 
   if (!inboxTasks) return <div className="p-8 text-center text-cozy-400">Loading...</div>;
@@ -98,14 +96,13 @@ export const Triage = () => {
       <div className="relative w-full max-w-sm h-[60vh] z-10">
         <AnimatePresence>
           {inboxTasks.length > 0 ? (
-            // Only render the top 2 cards for performance, but key by ID
             inboxTasks.slice(0, 2).map((task, index) => (
               <Card 
                 key={task.id} 
                 task={task} 
-                onSwipe={(dir) => handleSwipe(task.id!, dir)} 
+                onSwipe={(dir) => handleSwipe(task.id, dir)} 
               />
-            )).reverse() // Reverse so the first element is on top in DOM order (if using absolute) or z-index handled
+            )).reverse() 
           ) : (
             <motion.div 
                 initial={{ opacity: 0 }} 

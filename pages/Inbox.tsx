@@ -1,7 +1,5 @@
 
 import React, { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../db';
 import { TaskStatus, Task } from '../types';
 import { QuickCapture } from '../components/QuickCapture';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,12 +7,12 @@ import { Circle, CheckCircle2, LogOut } from 'lucide-react';
 import { hapticImpact } from '../services/haptics';
 import { useAuth } from '../contexts/AuthContext';
 import { TaskDetailModal } from '../components/TaskDetailModal';
+import { useTasks } from '../hooks/useFireStore'; // IMPORT FIRESTORE HOOK
 
-const TaskItem: React.FC<{ task: any, onSelect: (t: Task) => void }> = ({ task, onSelect }) => {
+const TaskItem: React.FC<{ task: any, onSelect: (t: Task) => void, onComplete: (id: string) => void }> = ({ task, onSelect, onComplete }) => {
   const handleComplete = (e: React.MouseEvent) => {
       e.stopPropagation();
-      hapticImpact.light();
-      db.tasks.update(task.id, { status: TaskStatus.DONE });
+      onComplete(task.id);
   };
 
   return (
@@ -45,13 +43,17 @@ export const Inbox = () => {
   const [showProfile, setShowProfile] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
-  const todayTasks = useLiveQuery(() => 
-    db.tasks.where('status').equals(TaskStatus.TODAY).toArray()
-  );
-
-  const inboxCount = useLiveQuery(() => 
-    db.tasks.where('status').equals(TaskStatus.INBOX).count()
-  );
+  // USE FIRESTORE HOOKS
+  const { tasks: todayTasks, updateTask } = useTasks({ status: TaskStatus.TODAY, excludeDeleted: true });
+  // We need a separate query for Inbox count if we want to show it.
+  // Ideally useTasks supports counting or we fetch all valid tasks and filter locally for small datasets.
+  // For now, let's just fetch inbox tasks to count them
+  const { tasks: inboxTasks } = useTasks({ status: TaskStatus.INBOX, excludeDeleted: true });
+  
+  const handleComplete = (taskId: string) => {
+      hapticImpact.light();
+      updateTask(taskId, { status: TaskStatus.DONE });
+  };
 
   return (
     <div className="min-h-screen pb-32">
@@ -60,11 +62,11 @@ export const Inbox = () => {
           <h1 className="text-3xl font-bold text-cozy-900">Today</h1>
           <div className="flex items-center gap-2 mt-1">
               <span className="text-cozy-500 font-medium">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
-              {inboxCount ? (
+              {inboxTasks.length > 0 && (
                   <span className="bg-rose-100 text-rose-600 text-xs px-2 py-0.5 rounded-full font-bold">
-                      {inboxCount} in Inbox
+                      {inboxTasks.length} in Inbox
                   </span>
-              ) : null}
+              )}
           </div>
         </div>
         
@@ -105,7 +107,7 @@ export const Inbox = () => {
 
       <div className="px-6">
         <AnimatePresence mode='popLayout'>
-          {todayTasks?.length === 0 ? (
+          {todayTasks.length === 0 ? (
              <motion.div 
                 initial={{ opacity: 0 }} 
                 animate={{ opacity: 1 }}
@@ -118,8 +120,8 @@ export const Inbox = () => {
                  <p className="text-sm text-cozy-300 mt-2">Check your Inbox Triage!</p>
              </motion.div>
           ) : (
-             todayTasks?.map(task => (
-                <TaskItem key={task.id} task={task} onSelect={setSelectedTask} />
+             todayTasks.map(task => (
+                <TaskItem key={task.id} task={task} onSelect={setSelectedTask} onComplete={handleComplete} />
              ))
           )}
         </AnimatePresence>
