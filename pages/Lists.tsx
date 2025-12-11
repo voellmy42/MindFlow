@@ -39,9 +39,9 @@ const CreateListModal = ({ onClose }: { onClose: () => void }) => {
     const handleJoin = async () => {
         if (!inviteLink.trim()) return;
 
-        const match = inviteLink.match(/\/join\/([a-zA-Z0-9-]+)/);
+        const match = inviteLink.match(/\/join\/([a-zA-Z0-9-]+)/) || inviteLink.match(/^([a-zA-Z0-9-]+)$/);
         if (!match) {
-            setJoinError("Invalid link format. Must contain /join/{id}");
+            setJoinError("Invalid link or ID format.");
             hapticImpact.error();
             return;
         }
@@ -312,7 +312,7 @@ const ListDetailView = ({ list, onClose, onDelete, onShare }: { list: any, onClo
 };
 
 export const Lists = () => {
-    const { lists, deleteList } = useLists();
+    const { lists, deleteList, updateList } = useLists();
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [isCreating, setIsCreating] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -398,7 +398,18 @@ export const Lists = () => {
                                         {list.role === 'editor' && <Users size={16} className="opacity-40" />}
                                     </div>
                                     <div
-                                        onClick={(e) => { e.stopPropagation(); setSharingList(list); }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            // Handle Legacy Lists without sharedId
+                                            if (!list.sharedId) {
+                                                const newId = crypto.randomUUID();
+                                                updateList(String(list.id), { sharedId: newId });
+                                                // Optimistic update for the modal
+                                                setSharingList({ ...list, sharedId: newId });
+                                            } else {
+                                                setSharingList(list);
+                                            }
+                                        }}
                                         className="absolute top-4 right-4 p-2 rounded-full bg-white/20 hover:bg-white/40 opacity-0 group-hover:opacity-100 transition-opacity"
                                     >
                                         <Share2 size={18} className="text-cozy-900" />
@@ -425,7 +436,17 @@ export const Lists = () => {
                                 setActiveList(null);
                             }
                         }}
-                        onShare={() => setSharingList(activeList)}
+                        onShare={() => {
+                            // Handle Legacy Lists without sharedId
+                            if (!activeList.sharedId) {
+                                const newId = crypto.randomUUID();
+                                updateList(activeList.id, { sharedId: newId });
+                                // Optimistic update for the modal
+                                setSharingList({ ...activeList, sharedId: newId });
+                            } else {
+                                setSharingList(activeList);
+                            }
+                        }}
                     />
                 )}
                 {sharingList && <ShareListModal list={sharingList} onClose={() => setSharingList(null)} />}
