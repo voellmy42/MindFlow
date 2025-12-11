@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useLists, useTasks } from '../hooks/useFireStore'; // Updated hook
 import { TaskStatus } from '../types';
 import { hapticImpact } from '../services/haptics';
+import { playSynthSound } from '../services/sounds';
 import { Plus, X, Trash2, ChevronLeft, Circle, Send, Share2, Users, CheckSquare, LayoutGrid, StretchHorizontal, SquareLibrary, BookOpen, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Recipes } from './Recipes';
@@ -226,9 +227,16 @@ const ListDetailView = ({ list, onClose, onDelete, onShare }: { list: any, onClo
         setInput('');
     };
 
-    const toggleTask = (taskId: string) => {
+    const toggleTask = async (taskId: string) => {
+        console.log("Toggling task:", taskId);
         hapticImpact.light();
-        updateTask(taskId, { status: TaskStatus.DONE });
+        playSynthSound('success');
+        try {
+            await updateTask(taskId, { status: TaskStatus.DONE });
+            console.log("Task toggled successfully");
+        } catch (e) {
+            console.error("Task toggle failed:", e);
+        }
     };
 
     return (
@@ -252,6 +260,7 @@ const ListDetailView = ({ list, onClose, onDelete, onShare }: { list: any, onClo
                 </div>
             </div>
             <h1 className="text-4xl font-extrabold text-cozy-900 leading-tight px-6 pt-2">{list.name}</h1>
+
             <p className="text-cozy-900/60 font-bold text-sm mt-1 uppercase tracking-wide opacity-80">
                 {displayTasks.length} Items
             </p>
@@ -262,7 +271,7 @@ const ListDetailView = ({ list, onClose, onDelete, onShare }: { list: any, onClo
                 <div className="space-y-3">
                     {displayTasks.map((task: any) => (
                         <div key={task.id} className="bg-white rounded-2xl shadow-sm border border-cozy-100 flex items-center gap-3 p-4 group active:scale-[0.99] transition-all">
-                            <button onClick={(e) => { e.stopPropagation(); toggleTask(task.id); }} className="text-cozy-300 hover:text-green-500 shrink-0">
+                            <button onClick={(e) => { e.stopPropagation(); toggleTask(task.id); }} className="p-2 -m-2 text-cozy-300 hover:text-green-500 shrink-0">
                                 <Circle size={24} strokeWidth={1.5} />
                             </button>
                             <div className="flex-1 min-w-0" onClick={() => setEditingTask(task)}>

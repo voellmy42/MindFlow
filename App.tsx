@@ -8,6 +8,9 @@ import { Lists } from './pages/Lists';
 import { AllTasks } from './pages/AllTasks';
 import { Login } from './pages/Login';
 import { Join } from './pages/Join';
+import { ShareHandler } from './components/ShareHandler';
+// import { InstallPrompt } from './components/InstallPrompt'; // DELETED/MOVED TO CONTEXT
+import { InstallProvider } from './contexts/InstallContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { db } from './lib/firebase'; // Firestore
@@ -79,6 +82,8 @@ const AppContent = () => {
   return (
     <Router>
       <WakeUpService />
+      <ShareHandler />
+      {/* <InstallPrompt /> Removed global overlay */}
       <div className="min-h-screen bg-cozy-50 text-cozy-900 font-sans antialiased selection:bg-rose-200 selection:text-rose-900">
         <main className="max-w-md mx-auto h-full min-h-screen bg-white shadow-2xl overflow-hidden relative">
           <Routes>
@@ -100,7 +105,9 @@ const AppContent = () => {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <InstallProvider>
+        <AppContent />
+      </InstallProvider>
     </AuthProvider>
   );
 }

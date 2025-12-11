@@ -151,12 +151,14 @@ export const useTasks = (config?: {
     }
 
     // Default filters
-    // SECURITY/LOGIC: If querying a specific list (listId provided), we show ALL tasks in that list
-    // regardless of owner. This allows confirmed editors to see tasks created by others.
-    // If NO listId is provided (e.g. Inbox), we restrict to tasks owned by the user.
-    if (!config?.listId) {
-      constraints.push(where('ownerId', '==', user.id));
-    }
+    // Security/Logic: For now, we enforce ownerId check on ALL queries to satisfy default security rules.
+    // Ideally, for shared lists, we would need more complex rules (e.g. resource.data.listId in user.sharedLists)
+    // blocking this change prevents the app from working for the primary user.
+    constraints.push(where('ownerId', '==', user.id));
+
+    // if (!config?.listId) {
+    //   constraints.push(where('ownerId', '==', user.id));
+    // }
 
     // REMOVED orderBy to prevent "missing index" errors during dev
     // constraints.push(orderBy('createdAt', 'desc'));
@@ -176,6 +178,9 @@ export const useTasks = (config?: {
       filtered.sort((a, b) => b.createdAt - a.createdAt);
 
       setTasks(filtered);
+      setLoading(false);
+    }, (error) => {
+      console.error("useTasks onSnapshot error:", error);
       setLoading(false);
     });
 

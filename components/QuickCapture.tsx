@@ -85,9 +85,27 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ task, index, onSwipe }) => {
     );
 };
 
-export const QuickCapture = () => {
+export interface QuickCaptureProps {
+    forceOpen?: boolean;
+    initialContent?: string;
+    onClose?: () => void;
+}
+
+export const QuickCapture: React.FC<QuickCaptureProps> = ({ forceOpen, initialContent, onClose }) => {
     const [isListening, setIsListening] = useState(false);
     const [input, setInput] = useState('');
+
+    useEffect(() => {
+        if (initialContent) {
+            setInput(initialContent);
+        }
+    }, [initialContent]);
+
+    // Logic to handle forceOpen is tricky with current design as it spawns a different UI for review vs input
+    // The current QuickCapture is a bottom bar.
+    // If we want "forceOpen", we might want to focus the input or show a modal?
+    // Based on ShareHandler design, it seems we want to show it.
+
 
     // Hook for Firestore Actions
     const { addTask } = useTasks();
@@ -127,6 +145,7 @@ export const QuickCapture = () => {
             dueAt: taskDueAt,
             source: 'manual' as const,
         });
+        if (onClose) onClose();
         setInput('');
     };
 
@@ -300,6 +319,7 @@ export const QuickCapture = () => {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Quick capture..."
+                    autoFocus={!!forceOpen} // Auto focus if forced open
                     className="w-full py-4 px-4 text-lg bg-transparent outline-none placeholder:text-cozy-300 text-cozy-800"
                 />
 

@@ -7,12 +7,15 @@ import { Circle, CheckCircle2, LogOut } from 'lucide-react';
 import { hapticImpact } from '../services/haptics';
 import { useAuth } from '../contexts/AuthContext';
 import { TaskDetailModal } from '../components/TaskDetailModal';
-import { useTasks } from '../hooks/useFireStore'; // IMPORT FIRESTORE HOOK
+import { useTasks } from '../hooks/useFireStore'; // IMPORT FIRESTORE Hook
+import { playSynthSound } from '../services/sounds';
+import { useInstallPrompt } from '../contexts/InstallContext';
+import { Download } from 'lucide-react';
 
 const TaskItem: React.FC<{ task: any, onSelect: (t: Task) => void, onComplete: (id: string) => void }> = ({ task, onSelect, onComplete }) => {
   const handleComplete = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      onComplete(task.id);
+    e.stopPropagation();
+    onComplete(task.id);
   };
 
   return (
@@ -30,9 +33,9 @@ const TaskItem: React.FC<{ task: any, onSelect: (t: Task) => void, onComplete: (
         <span className="text-lg text-cozy-800 font-medium block">{task.content}</span>
       </div>
       {task.source === 'recipe' && (
-          <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-400 bg-indigo-50 px-2 py-1 rounded-full shrink-0">
-              Recipe
-          </span>
+        <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-400 bg-indigo-50 px-2 py-1 rounded-full shrink-0">
+          Recipe
+        </span>
       )}
     </motion.div>
   );
@@ -40,6 +43,7 @@ const TaskItem: React.FC<{ task: any, onSelect: (t: Task) => void, onComplete: (
 
 export const Inbox = () => {
   const { user, logout } = useAuth();
+  const { isInstallable, handleInstallClick } = useInstallPrompt();
   const [showProfile, setShowProfile] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
@@ -49,10 +53,11 @@ export const Inbox = () => {
   // Ideally useTasks supports counting or we fetch all valid tasks and filter locally for small datasets.
   // For now, let's just fetch inbox tasks to count them
   const { tasks: inboxTasks } = useTasks({ status: TaskStatus.INBOX, excludeDeleted: true });
-  
+
   const handleComplete = (taskId: string) => {
-      hapticImpact.light();
-      updateTask(taskId, { status: TaskStatus.DONE });
+    hapticImpact.light();
+    playSynthSound('success');
+    updateTask(taskId, { status: TaskStatus.DONE });
   };
 
   return (
@@ -61,68 +66,76 @@ export const Inbox = () => {
         <div>
           <h1 className="text-3xl font-bold text-cozy-900">Today</h1>
           <div className="flex items-center gap-2 mt-1">
-              <span className="text-cozy-500 font-medium">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
-              {inboxTasks.length > 0 && (
-                  <span className="bg-rose-100 text-rose-600 text-xs px-2 py-0.5 rounded-full font-bold">
-                      {inboxTasks.length} in Inbox
-                  </span>
-              )}
+            <span className="text-cozy-500 font-medium">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+            {inboxTasks.length > 0 && (
+              <span className="bg-rose-100 text-rose-600 text-xs px-2 py-0.5 rounded-full font-bold">
+                {inboxTasks.length} in Inbox
+              </span>
+            )}
           </div>
         </div>
-        
+
         {/* User Avatar / Profile Menu */}
         <div className="relative">
-            <button 
-                onClick={() => setShowProfile(!showProfile)}
-                className="w-10 h-10 rounded-full bg-cozy-100 border border-white shadow-sm overflow-hidden active:scale-95 transition-transform"
-            >
-                <img src={user?.avatar} alt={user?.name} className="w-full h-full object-cover" />
-            </button>
-            <AnimatePresence>
-                {showProfile && (
-                    <>
-                        <div className="fixed inset-0 z-10" onClick={() => setShowProfile(false)} />
-                        <motion.div 
-                            initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                            className="absolute right-0 top-12 w-48 bg-white rounded-2xl shadow-xl border border-cozy-100 p-2 z-20 origin-top-right"
-                        >
-                            <div className="px-3 py-2 border-b border-cozy-50 mb-1">
-                                <p className="text-sm font-bold text-cozy-900 truncate">{user?.name}</p>
-                                <p className="text-xs text-cozy-400 truncate">{user?.email || 'Guest Mode'}</p>
-                            </div>
-                            <button 
-                                onClick={() => { logout(); }}
-                                className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-xl transition-colors flex items-center gap-2"
-                            >
-                                <LogOut size={14} /> Sign Out
-                            </button>
-                        </motion.div>
-                    </>
-                )}
-            </AnimatePresence>
+          <button
+            onClick={() => setShowProfile(!showProfile)}
+            className="w-10 h-10 rounded-full bg-cozy-100 border border-white shadow-sm overflow-hidden active:scale-95 transition-transform"
+          >
+            <img src={user?.avatar} alt={user?.name} className="w-full h-full object-cover" />
+          </button>
+          <AnimatePresence>
+            {showProfile && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowProfile(false)} />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                  className="absolute right-0 top-12 w-48 bg-white rounded-2xl shadow-xl border border-cozy-100 p-2 z-20 origin-top-right"
+                >
+                  <div className="px-3 py-2 border-b border-cozy-50 mb-1">
+                    <p className="text-sm font-bold text-cozy-900 truncate">{user?.name}</p>
+                    <p className="text-xs text-cozy-400 truncate">{user?.email || 'Guest Mode'}</p>
+                  </div>
+                  <button
+                    onClick={() => { logout(); }}
+                    className="w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-xl transition-colors flex items-center gap-2"
+                  >
+                    <LogOut size={14} /> Sign Out
+                  </button>
+                  {isInstallable && (
+                    <button
+                      onClick={() => { handleInstallClick(); setShowProfile(false); }}
+                      className="w-full text-left px-3 py-2 text-sm text-cozy-700 hover:bg-cozy-50 rounded-xl transition-colors flex items-center gap-2"
+                    >
+                      <Download size={14} /> Install App
+                    </button>
+                  )}
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         </div>
       </header>
 
       <div className="px-6">
         <AnimatePresence mode='popLayout'>
           {todayTasks.length === 0 ? (
-             <motion.div 
-                initial={{ opacity: 0 }} 
-                animate={{ opacity: 1 }}
-                className="py-12 text-center"
-             >
-                 <div className="inline-block p-4 bg-white rounded-full shadow-sm mb-4">
-                    <CheckCircle2 size={32} className="text-cozy-300" />
-                 </div>
-                 <p className="text-cozy-400">No tasks for today.</p>
-                 <p className="text-sm text-cozy-300 mt-2">Check your Inbox Triage!</p>
-             </motion.div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="py-12 text-center"
+            >
+              <div className="inline-block p-4 bg-white rounded-full shadow-sm mb-4">
+                <CheckCircle2 size={32} className="text-cozy-300" />
+              </div>
+              <p className="text-cozy-400">No tasks for today.</p>
+              <p className="text-sm text-cozy-300 mt-2">Check your Inbox Triage!</p>
+            </motion.div>
           ) : (
-             todayTasks.map(task => (
-                <TaskItem key={task.id} task={task} onSelect={setSelectedTask} onComplete={handleComplete} />
-             ))
+            todayTasks.map(task => (
+              <TaskItem key={task.id} task={task} onSelect={setSelectedTask} onComplete={handleComplete} />
+            ))
           )}
         </AnimatePresence>
       </div>
@@ -131,11 +144,11 @@ export const Inbox = () => {
 
       <AnimatePresence>
         {selectedTask && (
-            <TaskDetailModal 
-                key={selectedTask.id} 
-                task={selectedTask} 
-                onClose={() => setSelectedTask(null)} 
-            />
+          <TaskDetailModal
+            key={selectedTask.id}
+            task={selectedTask}
+            onClose={() => setSelectedTask(null)}
+          />
         )}
       </AnimatePresence>
     </div>
