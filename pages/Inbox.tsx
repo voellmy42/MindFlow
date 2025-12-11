@@ -41,11 +41,15 @@ const TaskItem: React.FC<{ task: any, onSelect: (t: Task) => void, onComplete: (
   );
 };
 
+import { InboxView } from '../components/InboxView';
+import { ReviewModal } from '../components/ReviewModal';
+
 export const Inbox = () => {
   const { user, logout } = useAuth();
   const { isInstallable, handleInstallClick } = useInstallPrompt();
   const [showProfile, setShowProfile] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [reviewItem, setReviewItem] = useState<any | null>(null);
 
   // USE FIRESTORE HOOKS
   const { tasks: todayTasks, updateTask } = useTasks({ status: TaskStatus.TODAY, excludeDeleted: true });
@@ -119,6 +123,7 @@ export const Inbox = () => {
       </header>
 
       <div className="px-6">
+        <InboxView onReview={(item) => setReviewItem(item)} hideIfEmpty={true} />
         <AnimatePresence mode='popLayout'>
           {todayTasks.length === 0 ? (
             <motion.div
@@ -148,6 +153,12 @@ export const Inbox = () => {
             key={selectedTask.id}
             task={selectedTask}
             onClose={() => setSelectedTask(null)}
+          />
+        )}
+        {reviewItem && (
+          <ReviewModal
+            item={reviewItem}
+            onClose={() => setReviewItem(null)}
           />
         )}
       </AnimatePresence>

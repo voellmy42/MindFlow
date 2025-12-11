@@ -159,11 +159,23 @@ const processWithGemini = async (
 
   } catch (error: any) {
     console.error("AI Processing Error", error);
+
+    let errorMessage = "Failed to process";
+    const errorString = JSON.stringify(error) + (error.message || "");
+
+    if (errorString.includes("Generative Language API has not been used") || errorString.includes("disabled")) {
+      errorMessage = "API Disabled. Check Google Cloud Console.";
+    } else if (errorString.includes("API key not valid") || errorString.includes("400")) {
+      errorMessage = "Invalid API Key. Check Settings.";
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
     // 4. Update Doc with Error
     if (docId) {
       await updateDoc(doc(db, 'staging', docId), {
         status: 'error',
-        summary: "Failed to process",
+        summary: errorMessage,
         error: error.message || "Unknown AI error"
       });
     }

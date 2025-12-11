@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user owns the document
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // TASKS
+    match /tasks/{taskId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // LISTS
+    match /lists/{listId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // RECIPES
+    match /recipes/{recipeId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // STAGING (Voice Memos / Inbox)
+    match /staging/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

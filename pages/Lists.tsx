@@ -4,13 +4,11 @@ import { useLists, useTasks, useStaging } from '../hooks/useFireStore'; // Updat
 import { TaskStatus } from '../types';
 import { hapticImpact } from '../services/haptics';
 import { playSynthSound } from '../services/sounds';
-import { Plus, X, Trash2, ChevronLeft, Circle, Send, Share2, Users, CheckSquare, LayoutGrid, StretchHorizontal, SquareLibrary, BookOpen, AlertCircle, Settings, Inbox, Mic } from 'lucide-react';
+import { Plus, X, Trash2, ChevronLeft, Circle, Send, Share2, Users, CheckSquare, LayoutGrid, StretchHorizontal, SquareLibrary, BookOpen, AlertCircle, Settings, Mic } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Recipes } from './Recipes';
 import { TaskDetailModal } from '../components/TaskDetailModal';
 import { SettingsModal } from '../components/SettingsModal';
-import { InboxView } from '../components/InboxView';
-import { ReviewModal } from '../components/ReviewModal';
 import { Task } from '../types';
 
 const COLORS = [
@@ -320,12 +318,7 @@ export const Lists = () => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [activeList, setActiveList] = useState<any | null>(null);
     const [sharingList, setSharingList] = useState<any | null>(null);
-    const [activeTab, setActiveTab] = useState<'inbox' | 'lists' | 'recipes'>('lists');
-
-    // Triage / Review Modal State would go here, effectively lifting it from QuickCapture
-    // For now, let's just use QuickCapture's modal if we can, or we need to extract `ReviewModal`.
-    // Since we haven't extracted `ReviewModal` yet, we'll placeholder the review action.
-    const [reviewItem, setReviewItem] = useState<any | null>(null);
+    const [activeTab, setActiveTab] = useState<'lists' | 'recipes'>('lists');
 
     return (
         <div className="pt-10 px-6 pb-24 min-h-screen flex flex-col">
@@ -338,13 +331,7 @@ export const Lists = () => {
                 </div>
 
                 <div className="flex bg-cozy-100 p-1 rounded-2xl w-full">
-                    <button
-                        onClick={() => { setActiveTab('inbox'); hapticImpact.light(); }}
-                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'inbox' ? 'bg-white shadow-sm text-cozy-900' : 'text-cozy-400'}`}
-                    >
-                        <Inbox size={18} />
-                        Inbox
-                    </button>
+
                     <button
                         onClick={() => { setActiveTab('lists'); hapticImpact.light(); }}
                         className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'lists' ? 'bg-white shadow-sm text-cozy-900' : 'text-cozy-400'}`}
@@ -362,11 +349,7 @@ export const Lists = () => {
                 </div>
             </header>
 
-            {activeTab === 'inbox' && (
-                <div className="flex-1 flex flex-col">
-                    <InboxView onReview={(item) => setReviewItem(item)} />
-                </div>
-            )}
+
 
             {activeTab === 'recipes' && (
                 <div className="animate-in fade-in slide-in-from-left-4 duration-300">
@@ -447,19 +430,7 @@ export const Lists = () => {
                 )}
                 {sharingList && <ShareListModal list={sharingList} onClose={() => setSharingList(null)} />}
 
-                {/* 
-                        TODO: Extract ReviewModal from QuickCapture and use it here.
-                        For now, if reviewItem is set, we could conceptually show the modal. 
-                        I'll add the Refactor step next to make this work.
-                    */}
-                {reviewItem && (
-                    <div className="fixed inset-0 z-[150] flex items-end justify-center pointer-events-none">
-                        <div className="pointer-events-auto bg-black text-white px-6 py-3 rounded-full mb-24 shadow-xl font-bold">
-                            Use Quick Capture to Review (Refactor Pending)
-                        </div>
-                        <button onClick={() => setReviewItem(null)} className="absolute inset-0 z-[-1] bg-black/10 pointer-events-auto backdrop-blur-[1px]" />
-                    </div>
-                )}
+
             </AnimatePresence>
         </div>
     );
