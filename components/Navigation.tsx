@@ -8,9 +8,8 @@ const NavItem = ({ to, icon: Icon, active, label }: { to: string; icon: any; act
   <Link
     to={to}
     onClick={() => vibrate(5)}
-    className={`flex flex-col items-center justify-center w-full h-full transition-all duration-200 ${
-      active ? 'text-cozy-900 scale-105' : 'text-cozy-400 hover:text-cozy-600'
-    }`}
+    className={`flex flex-col items-center justify-center w-full h-full transition-all duration-200 ${active ? 'text-cozy-900 scale-105' : 'text-cozy-400 hover:text-cozy-600'
+      }`}
   >
     <Icon size={24} strokeWidth={active ? 2.5 : 2} />
     <span className="text-[10px] font-medium mt-1">{label}</span>
@@ -25,7 +24,7 @@ export const Navigation = () => {
       <NavItem to="/" icon={Inbox} active={location.pathname === '/' || location.pathname === '/capture'} label="Flow" />
       <NavItem to="/triage" icon={Layers} active={location.pathname === '/triage'} label="Triage" />
       <NavItem to="/all" icon={Calendar} active={location.pathname === '/all'} label="Plan" />
-      <NavItem to="/lists" icon={List} active={location.pathname === '/lists'} label="Lists" />
+      <NavItem to="/lists" icon={List} active={location.pathname === '/lists' || location.pathname === '/recipes'} label="Lists" />
     </nav>
   );
 };

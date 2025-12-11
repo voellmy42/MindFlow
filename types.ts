@@ -16,6 +16,7 @@ export interface List {
   icon?: string; // e.g. emoji
   createdAt: number;
   role?: 'owner' | 'editor'; // 'owner' can delete list, 'editor' can only edit content
+  sharedWith?: string[]; // Array of user IDs or emails who have access
   lastSyncedAt?: number;
 }
 

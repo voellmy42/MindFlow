@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { db } from '../db';
+import { db, auth } from '../lib/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 import { StagingItem } from '../types';
 
 // Helper: Blob to Base64
@@ -20,7 +21,7 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
 
 export const processVoiceMemo = async (audioBlob: Blob, contextTasks: any[] = []) => {
   const isRefinement = contextTasks.length > 0;
-  
+
   // Request notification permission if not already granted
   if (Notification.permission === 'default') {
     Notification.requestPermission();
@@ -53,40 +54,40 @@ export const processVoiceMemo = async (audioBlob: Blob, contextTasks: any[] = []
     `;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
+      model: 'gemini-2.5-flash',
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            summary: { type: Type.STRING },
+            tasks: {
+              type: Type.ARRAY,
+              items: {
                 type: Type.OBJECT,
                 properties: {
-                    summary: { type: Type.STRING },
-                    tasks: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                content: { type: Type.STRING },
-                                dueAt: { type: Type.STRING },
-                                responsible: { type: Type.STRING },
-                                notes: { type: Type.STRING }
-                            },
-                            required: ["content"]
-                        }
-                    }
-                }
+                  content: { type: Type.STRING },
+                  dueAt: { type: Type.STRING },
+                  responsible: { type: Type.STRING },
+                  notes: { type: Type.STRING }
+                },
+                required: ["content"]
+              }
             }
-        },
-        contents: {
-            parts: [
-                { text: systemPrompt },
-                {
-                    inlineData: {
-                        mimeType: audioBlob.type || 'audio/webm',
-                        data: base64Audio
-                    }
-                }
-            ]
+          }
         }
+      },
+      contents: {
+        parts: [
+          { text: systemPrompt },
+          {
+            inlineData: {
+              mimeType: audioBlob.type || 'audio/webm',
+              data: base64Audio
+            }
+          }
+        ]
+      }
     });
 
     const result = JSON.parse(response.text || '{}');
@@ -106,13 +107,18 @@ export const processVoiceMemo = async (audioBlob: Blob, contextTasks: any[] = []
 
       // If refinement, we might want to update an existing staging item, but for now we append new results.
       // A more complex app would manage session IDs. Here, we just add to the queue.
-      await db.staging.add(stagingItem);
+      if (auth.currentUser) {
+        await addDoc(collection(db, 'staging'), {
+          ...stagingItem,
+          ownerId: auth.currentUser.uid
+        });
+      }
 
       // Trigger Notification
       if (Notification.permission === 'granted' && document.hidden) {
         new Notification("MindFlow", {
-            body: `${result.summary}`,
-            icon: '/icon-192.png' // Assumes manifest icon path
+          body: `${result.summary}`,
+          icon: '/icon-192.png' // Assumes manifest icon path
         });
       }
     }

@@ -18,36 +18,36 @@ import { hapticImpact } from './services/haptics';
 // Checks for tasks that were snoozed or scheduled for the past/today and moves them to TODAY status
 const WakeUpService = () => {
   const { user } = useAuth();
-  
+
   useEffect(() => {
     if (!user) return;
 
     const checkAndPromoteTasks = async () => {
       const now = Date.now();
-      
+
       // Query tasks that are SNOOZED and due <= now
       const q = query(
-          collection(db, 'tasks'),
-          where('status', '==', TaskStatus.SNOOZED),
-          where('dueAt', '<=', now)
+        collection(db, 'tasks'),
+        where('status', '==', TaskStatus.SNOOZED),
+        where('dueAt', '<=', now)
       );
 
       const snapshot = await getDocs(q);
-      
+
       if (!snapshot.empty) {
         const batch = writeBatch(db);
         let count = 0;
-        
+
         snapshot.forEach(t => {
-           // Double check ownership or permissions in real app, but query implicitly implies visibility if rules set
-           batch.update(doc(db, 'tasks', t.id), { status: TaskStatus.TODAY });
-           count++;
+          // Double check ownership or permissions in real app, but query implicitly implies visibility if rules set
+          batch.update(doc(db, 'tasks', t.id), { status: TaskStatus.TODAY });
+          count++;
         });
 
         await batch.commit();
         if (count > 0) {
-            console.log(`Waking up ${count} tasks`);
-            hapticImpact.medium();
+          console.log(`Waking up ${count} tasks`);
+          hapticImpact.medium();
         }
       }
     };
@@ -83,6 +83,7 @@ const AppContent = () => {
           <Routes>
             <Route path="/" element={<Inbox />} />
             <Route path="/triage" element={<Triage />} />
+            <Route path="/triage" element={<Triage />} />
             <Route path="/lists" element={<Lists />} />
             <Route path="/all" element={<AllTasks />} />
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -97,7 +98,7 @@ const AppContent = () => {
 function App() {
   return (
     <AuthProvider>
-        <AppContent />
+      <AppContent />
     </AuthProvider>
   );
 }

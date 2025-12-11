@@ -7,13 +7,13 @@ import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 // FIREBASE CONFIGURATION
 // ------------------------------------------------------------------
 const firebaseConfig = {
-  apiKey: "AIzaSyDor_60oq0OHGtA7iRBtHYkCCrvXl5rdfw",
-  authDomain: "mindflow-9335f.firebaseapp.com",
-  projectId: "mindflow-9335f",
-  storageBucket: "mindflow-9335f.firebasestorage.app",
-  messagingSenderId: "692513852890",
-  appId: "1:692513852890:web:47764a4767b1b8a16844e3",
-  measurementId: "G-1FGBFFT41E"
+    apiKey: "AIzaSyDor_60oq0OHGtA7iRBtHYkCCrvXl5rdfw",
+    authDomain: "mindflow-9335f.firebaseapp.com",
+    projectId: "mindflow-9335f",
+    storageBucket: "mindflow-9335f.firebasestorage.app",
+    messagingSenderId: "692513852890",
+    appId: "1:692513852890:web:47764a4767b1b8a16844e3",
+    measurementId: "G-1FGBFFT41E"
 };
 
 // Initialize Firebase
