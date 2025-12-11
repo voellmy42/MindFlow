@@ -385,7 +385,7 @@ export const Lists = () => {
 
                     <div className="flex-1">
                         <div className={`grid ${viewMode === 'grid' ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
-                            {lists.map(list => (
+                            {lists.filter(l => l.name !== 'Inbox').map(list => (
                                 <motion.button
                                     layout
                                     key={list.id}
