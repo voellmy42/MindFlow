@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useLists, useTasks } from '../hooks/useFireStore'; // Updated hook
 import { TaskStatus } from '../types';
 import { hapticImpact } from '../services/haptics';
-import { Plus, X, Trash2, ChevronLeft, Circle, Send, Share2, Users, CheckSquare, LayoutGrid, StretchHorizontal, SquareLibrary, BookOpen } from 'lucide-react';
+import { Plus, X, Trash2, ChevronLeft, Circle, Send, Share2, Users, CheckSquare, LayoutGrid, StretchHorizontal, SquareLibrary, BookOpen, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Recipes } from './Recipes';
 import { TaskDetailModal } from '../components/TaskDetailModal';
@@ -18,49 +18,151 @@ const COLORS = [
 ];
 
 const CreateListModal = ({ onClose }: { onClose: () => void }) => {
+    const [step, setStep] = useState<'select' | 'create' | 'join'>('select');
     const [name, setName] = useState('');
     const [color, setColor] = useState(COLORS[0]);
-    const { addList } = useLists();
 
-    const handleSave = async () => {
+    const [inviteLink, setInviteLink] = useState('');
+    const [joinError, setJoinError] = useState<string | null>(null);
+
+    const { addList, joinList } = useLists();
+
+    const handleCreate = async () => {
         if (!name.trim()) return;
         hapticImpact.success();
         await addList({ name, color });
         onClose();
     };
 
+    const handleJoin = async () => {
+        if (!inviteLink.trim()) return;
+
+        const match = inviteLink.match(/\/join\/([a-zA-Z0-9-]+)/);
+        if (!match) {
+            setJoinError("Invalid link format. Must contain /join/{id}");
+            hapticImpact.error();
+            return;
+        }
+
+        const sharedId = match[1];
+        try {
+            setJoinError(null);
+            const result = await joinList(sharedId);
+            hapticImpact.success();
+            onClose();
+        } catch (err: any) {
+            console.error(err);
+            setJoinError(err.message || "Failed to join list.");
+            hapticImpact.error();
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[110] flex flex-col bg-white animate-in fade-in slide-in-from-bottom-10 duration-200">
+            {/* Header */}
             <div className="flex justify-between items-center p-6 border-b border-cozy-100">
-                <h2 className="text-xl font-bold text-cozy-900">New List</h2>
+                <div className="flex items-center gap-3">
+                    {step !== 'select' && (
+                        <button onClick={() => { setStep('select'); hapticImpact.light(); }} className="p-2 -ml-2 rounded-full hover:bg-cozy-50 text-cozy-600">
+                            <ChevronLeft size={24} />
+                        </button>
+                    )}
+                    <h2 className="text-xl font-bold text-cozy-900">
+                        {step === 'select' && 'Add List'}
+                        {step === 'create' && 'New List'}
+                        {step === 'join' && 'Join List'}
+                    </h2>
+                </div>
                 <button onClick={onClose} className="p-2 bg-cozy-50 rounded-full text-cozy-600">
                     <X size={24} />
                 </button>
             </div>
+
             <div className="flex-1 p-6">
-                <input
-                    autoFocus
-                    type="text"
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    placeholder="e.g. Shopping"
-                    className="w-full text-3xl font-bold text-black placeholder:text-gray-400 outline-none bg-transparent appearance-none border-none p-0 mb-8"
-                />
-                <div className="flex flex-wrap gap-3">
-                    {COLORS.map(c => (
+                {step === 'select' && (
+                    <div className="grid grid-cols-1 gap-4">
                         <button
-                            key={c}
-                            onClick={() => { setColor(c); hapticImpact.light(); }}
-                            className={`w-10 h-10 rounded-full ${c} transition-transform ${color === c ? 'scale-125 ring-2 ring-offset-2 ring-cozy-300' : 'hover:scale-110'}`}
+                            onClick={() => { setStep('create'); hapticImpact.light(); }}
+                            className="p-6 bg-cozy-50 rounded-3xl text-left border-2 border-transparent hover:border-cozy-200 transition-all active:scale-[0.98]"
+                        >
+                            <div className="w-12 h-12 bg-cozy-900 rounded-full flex items-center justify-center text-white mb-4 shadow-md">
+                                <Plus size={24} />
+                            </div>
+                            <h3 className="text-xl font-bold text-cozy-900">Create New List</h3>
+                            <p className="text-cozy-500 mt-1">Start a fresh list for your tasks.</p>
+                        </button>
+
+                        <button
+                            onClick={() => { setStep('join'); hapticImpact.light(); }}
+                            className="p-6 bg-cozy-50 rounded-3xl text-left border-2 border-transparent hover:border-cozy-200 transition-all active:scale-[0.98]"
+                        >
+                            <div className="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center text-white mb-4 shadow-md">
+                                <Users size={24} />
+                            </div>
+                            <h3 className="text-xl font-bold text-cozy-900">Join Existing List</h3>
+                            <p className="text-cozy-500 mt-1">Paste an invite link to collaborate.</p>
+                        </button>
+                    </div>
+                )}
+
+                {step === 'create' && (
+                    <div className="animate-in fade-in slide-in-from-right-8 duration-300">
+                        <input
+                            autoFocus
+                            type="text"
+                            value={name}
+                            onChange={e => setName(e.target.value)}
+                            placeholder="e.g. Shopping"
+                            className="w-full text-3xl font-bold text-black placeholder:text-gray-400 outline-none bg-transparent appearance-none border-none p-0 mb-8"
                         />
-                    ))}
+                        <div className="flex flex-wrap gap-3">
+                            {COLORS.map(c => (
+                                <button
+                                    key={c}
+                                    onClick={() => { setColor(c); hapticImpact.light(); }}
+                                    className={`w-10 h-10 rounded-full ${c} transition-transform ${color === c ? 'scale-125 ring-2 ring-offset-2 ring-cozy-300' : 'hover:scale-110'}`}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {step === 'join' && (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-right-8 duration-300">
+                        <div className="bg-cozy-50 p-4 rounded-2xl">
+                            <label className="block text-xs font-bold uppercase text-cozy-500 mb-2">Invite Link</label>
+                            <input
+                                autoFocus
+                                type="text"
+                                value={inviteLink}
+                                onChange={e => { setInviteLink(e.target.value); setJoinError(null); }}
+                                placeholder="Paste link here..."
+                                className="w-full text-lg bg-transparent outline-none text-cozy-900"
+                            />
+                        </div>
+                        {joinError && (
+                            <div className="text-red-500 font-medium text-sm flex items-center gap-2">
+                                <AlertCircle size={16} />
+                                {joinError}
+                            </div>
+                        )}
+                        <p className="text-cozy-400 text-sm">
+                            Paste the link shared with you to collaborate on a list.
+                        </p>
+                    </div>
+                )}
+            </div>
+
+            {step !== 'select' && (
+                <div className="p-6 border-t border-cozy-100 bg-cozy-50 pb-safe">
+                    <button
+                        onClick={step === 'create' ? handleCreate : handleJoin}
+                        className="w-full py-4 bg-cozy-900 text-white rounded-2xl font-bold text-lg shadow-lg"
+                    >
+                        {step === 'create' ? 'Create List' : 'Join List'}
+                    </button>
                 </div>
-            </div>
-            <div className="p-6 border-t border-cozy-100 bg-cozy-50 pb-safe">
-                <button onClick={handleSave} className="w-full py-4 bg-cozy-900 text-white rounded-2xl font-bold text-lg shadow-lg">
-                    Create List
-                </button>
-            </div>
+            )}
         </div>
     );
 };
@@ -241,7 +343,14 @@ export const Lists = () => {
                 </div>
             ) : (
                 <div className="flex-1 flex flex-col animate-in fade-in slide-in-from-right-4 duration-300">
-                    <div className="flex justify-end mb-4 px-1">
+                    <div className="flex justify-between mb-4 px-1">
+                        <button
+                            onClick={() => setIsCreating(true)}
+                            className="bg-cozy-900 text-white p-2 rounded-xl shadow-lg active:scale-90 transition-transform flex items-center gap-2 px-4"
+                        >
+                            <Plus size={20} />
+                            <span className="font-bold text-sm">New</span>
+                        </button>
                         <div className="bg-cozy-100 p-1 rounded-xl flex gap-1">
                             <button
                                 onClick={() => { setViewMode('list'); hapticImpact.light(); }}
@@ -281,15 +390,6 @@ export const Lists = () => {
                                 </motion.button>
                             ))}
 
-                            <motion.button
-                                layout
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => setIsCreating(true)}
-                                className={`rounded-3xl border-2 border-dashed border-cozy-200 flex items-center justify-center text-cozy-300 hover:text-cozy-500 hover:border-cozy-300 transition-colors ${viewMode === 'grid' ? 'aspect-square flex-col' : 'h-20 flex-row gap-2'}`}
-                            >
-                                <Plus size={viewMode === 'grid' ? 32 : 24} />
-                                <span className="font-bold text-sm">New List</span>
-                            </motion.button>
                         </div>
                     </div>
                 </div>

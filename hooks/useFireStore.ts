@@ -151,7 +151,13 @@ export const useTasks = (config?: {
     }
 
     // Default filters
-    constraints.push(where('ownerId', '==', user.id));
+    // SECURITY/LOGIC: If querying a specific list (listId provided), we show ALL tasks in that list
+    // regardless of owner. This allows confirmed editors to see tasks created by others.
+    // If NO listId is provided (e.g. Inbox), we restrict to tasks owned by the user.
+    if (!config?.listId) {
+      constraints.push(where('ownerId', '==', user.id));
+    }
+
     // REMOVED orderBy to prevent "missing index" errors during dev
     // constraints.push(orderBy('createdAt', 'desc'));
 
