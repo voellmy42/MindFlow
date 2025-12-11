@@ -243,67 +243,105 @@ const ListDetailView = ({ list, onClose, onDelete, onShare }: { list: any, onClo
     return (
         <div className="fixed inset-0 z-[100] bg-cozy-50 flex flex-col h-[100dvh] animate-in slide-in-from-right duration-300">
             {/* Header */}
-            <div className={`shrink-0 ${list.color} px-6 pt-6 pb-6`}>
-                <div className="flex justify-between items-center">
-                    <button onClick={onClose} className="p-3 rounded-full hover:bg-black/5 text-cozy-900 transition-colors">
-                        <ChevronLeft size={28} />
+            <div className={`shrink-0 ${list.color} pt-14 pb-6 px-6 shadow-sm transition-colors duration-300 relative overflow-hidden`}>
+                {/* Background Pattern or Gradient could go here */}
+
+                <div className="flex justify-between items-center mb-6 relative z-10">
+                    <button
+                        onClick={onClose}
+                        className="w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/40 text-cozy-900 transition-colors backdrop-blur-sm"
+                    >
+                        <ChevronLeft size={24} />
                     </button>
                     <div className="flex gap-2">
-                        <button onClick={onShare} className="p-3 rounded-full hover:bg-black/5 text-cozy-900 transition-colors">
-                            <Share2 size={24} />
+                        <button
+                            onClick={onShare}
+                            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/40 text-cozy-900 transition-colors backdrop-blur-sm"
+                        >
+                            <Share2 size={20} />
                         </button>
                         {list.role === 'owner' && (
-                            <button onClick={onDelete} className="p-3 rounded-full hover:bg-red-500/20 hover:text-red-900 text-cozy-900 transition-colors">
-                                <Trash2 size={24} />
+                            <button
+                                onClick={onDelete}
+                                className="w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-red-500/30 text-cozy-900 transition-colors backdrop-blur-sm"
+                            >
+                                <Trash2 size={20} />
                             </button>
                         )}
                     </div>
                 </div>
-            </div>
-            <h1 className="text-4xl font-extrabold text-cozy-900 leading-tight px-6 pt-2">{list.name}</h1>
 
-            <p className="text-cozy-900/60 font-bold text-sm mt-1 uppercase tracking-wide opacity-80">
-                {displayTasks.length} Items
-            </p>
-            {/* Header End */}
+                <div className="relative z-10">
+                    <h1 className="text-4xl font-extrabold text-cozy-900 leading-tight tracking-tight mb-1">{list.name}</h1>
+                    <div className="flex items-center gap-2 text-cozy-900/60 font-medium text-sm bg-white/20 self-start inline-flex px-3 py-1 rounded-full backdrop-blur-sm">
+                        <CheckSquare size={14} />
+                        <span>{displayTasks.length} {displayTasks.length === 1 ? 'Task' : 'Tasks'}</span>
+                    </div>
+                </div>
+            </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 pb-32">
-                <div className="space-y-3">
+            <div className="flex-1 overflow-y-auto bg-cozy-50 rounded-t-3xl -mt-4 shadow-inner px-6 py-6 pb-32 z-20">
+                <div className="space-y-2">
                     {displayTasks.map((task: any) => (
-                        <div key={task.id} className="bg-white rounded-[1.2rem] shadow-sm shadow-cozy-900/5 border border-cozy-100 flex items-center gap-3 p-4 group active:scale-[0.99] transition-all hover:border-cozy-200">
-                            <button onClick={(e) => { e.stopPropagation(); toggleTask(task.id); }} className="p-2 -m-2 text-cozy-300 hover:text-green-500 shrink-0">
-                                <Circle size={24} strokeWidth={1.5} />
+                        <div
+                            key={task.id}
+                            className="bg-white p-3 rounded-xl shadow-sm border border-cozy-100 flex items-center gap-3 group active:scale-[0.99] transition-transform"
+                            onClick={() => setEditingTask(task)}
+                        >
+                            <button
+                                onClick={(e) => { e.stopPropagation(); toggleTask(task.id); }}
+                                className="p-1 -m-1 text-cozy-300 hover:text-green-500 transition-colors shrink-0"
+                            >
+                                <Circle size={24} />
                             </button>
-                            <div className="flex-1 min-w-0" onClick={() => setEditingTask(task)}>
-                                <span className="text-lg text-cozy-800 break-words block font-medium leading-tight">{task.content}</span>
+                            <div className="flex-1 min-w-0 cursor-pointer">
+                                <span className="text-sm font-bold text-cozy-900 leading-tight truncate">
+                                    {task.content}
+                                </span>
                             </div>
                         </div>
                     ))}
                 </div>
+
                 {displayTasks.length === 0 && (
-                    <div className="text-center text-cozy-400 py-10">
-                        <CheckSquare size={48} className="mx-auto mb-2 opacity-50" />
-                        <p>List is empty</p>
+                    <div className="flex flex-col items-center justify-center h-64 text-cozy-300 animate-in fade-in zoom-in duration-500">
+                        <div className="w-20 h-20 bg-cozy-50 rounded-full flex items-center justify-center mb-4">
+                            <CheckSquare size={32} className="opacity-50" />
+                        </div>
+                        <p className="font-medium">All caught up!</p>
+                        <p className="text-sm opacity-60">Add a task below</p>
                     </div>
                 )}
             </div>
 
-            {/* Input */}
-            <div className="p-4 bg-white border-t border-cozy-200 pb-safe shrink-0">
-                <form onSubmit={handleAdd} className="flex items-center gap-2">
-                    <input
-                        type="text"
-                        value={input}
-                        onChange={e => setInput(e.target.value)}
-                        className="flex-1 bg-cozy-100 rounded-xl px-4 py-3 outline-none text-cozy-900 placeholder:text-cozy-400"
-                        placeholder={`Add to ${list.name}...`}
-                    />
-                    <button type="submit" disabled={!input} className="p-3 bg-cozy-900 text-white rounded-xl">
-                        <Send size={20} />
-                    </button>
-                </form>
+            {/* Input Bar */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent pb-safe pt-8 px-4 z-30 pointer-events-none">
+                <div className="pointer-events-auto bg-white rounded-[2rem] shadow-xl shadow-cozy-900/10 border border-cozy-100 p-2 flex items-center gap-2 max-w-2xl mx-auto transform transition-transform focus-within:scale-[1.01]">
+                    <div className="w-10 h-10 rounded-full bg-cozy-50 flex items-center justify-center text-cozy-400 shrink-0">
+                        <Plus size={24} />
+                    </div>
+                    <form onSubmit={handleAdd} className="flex-1 flex items-center">
+                        <input
+                            autoFocus
+                            type="text"
+                            value={input}
+                            onChange={e => setInput(e.target.value)}
+                            className="w-full bg-transparent p-2 outline-none text-lg text-cozy-900 placeholder:text-cozy-300 font-medium"
+                            placeholder="Add a new task..."
+                        />
+                        {input.trim() && (
+                            <button
+                                type="submit"
+                                className="bg-cozy-900 text-white p-2.5 rounded-full hover:bg-black transition-colors shadow-sm animate-in zoom-in duration-200"
+                            >
+                                <Send size={18} />
+                            </button>
+                        )}
+                    </form>
+                </div>
             </div>
+
             <AnimatePresence>
                 {editingTask && <TaskDetailModal task={editingTask} onClose={() => setEditingTask(null)} />}
             </AnimatePresence>

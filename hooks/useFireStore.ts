@@ -151,14 +151,12 @@ export const useTasks = (config?: {
     }
 
     // Default filters
-    // Security/Logic: For now, we enforce ownerId check on ALL queries to satisfy default security rules.
-    // Ideally, for shared lists, we would need more complex rules (e.g. resource.data.listId in user.sharedLists)
-    // blocking this change prevents the app from working for the primary user.
-    constraints.push(where('ownerId', '==', user.id));
-
-    // if (!config?.listId) {
-    //   constraints.push(where('ownerId', '==', user.id));
-    // }
+    // Security/Logic: Only enforce ownerId if we are NOT looking at a specific list.
+    // If we are looking at a specific list, we want to see ALL tasks in that list, regardless of owner.
+    // (Access control should ideally be handled by Firestore Security Rules checking list membership)
+    if (!config?.listId) {
+      constraints.push(where('ownerId', '==', user.id));
+    }
 
     // REMOVED orderBy to prevent "missing index" errors during dev
     // constraints.push(orderBy('createdAt', 'desc'));
