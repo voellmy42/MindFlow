@@ -49,6 +49,8 @@ export interface StagingItem {
   id?: string | number;
   createdAt: number;
   summary: string;
+  status: 'processing' | 'ready' | 'error';
+  error?: string;
   tasks: Array<{
     id: string; // temp id
     content: string;

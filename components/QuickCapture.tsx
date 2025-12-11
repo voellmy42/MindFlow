@@ -4,7 +4,7 @@ import { TaskStatus } from '../types';
 import { hapticImpact } from '../services/haptics';
 import { processVoiceMemo } from '../services/aiProcessor';
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion';
-import { useTasks, useStaging } from '../hooks/useFireStore';
+import { useTasks } from '../hooks/useFireStore';
 
 // --- Helper: Date Parsing ---
 const parseDateKeywords = (text: string) => {
@@ -34,57 +34,9 @@ const parseDateKeywords = (text: string) => {
     return null;
 };
 
-// --- Review Card Component ---
-interface ReviewCardProps {
-    task: any;
-    index: number;
-    onSwipe: (dir: 'left' | 'right') => void;
-}
 
-const ReviewCard: React.FC<ReviewCardProps> = ({ task, index, onSwipe }) => {
-    const x = useMotionValue(0);
-    const rotate = useTransform(x, [-150, 0, 150], [-15, 0, 15]);
-    const opacity = useTransform(x, [-200, -150, 0, 150, 200], [0, 1, 1, 1, 0]);
 
-    const rightOpacity = useTransform(x, [0, 100], [0, 1]);
-    const leftOpacity = useTransform(x, [0, -100], [0, 1]);
-
-    const handleDragEnd = (event: any, info: PanInfo) => {
-        if (info.offset.x > 100) onSwipe('right');
-        else if (info.offset.x < -100) onSwipe('left');
-    };
-
-    return (
-        <motion.div
-            style={{ x, rotate, opacity, zIndex: 100 - index }}
-            drag="x"
-            dragConstraints={{ left: 0, right: 0 }}
-            onDragEnd={handleDragEnd}
-            initial={{ scale: 0.9, y: 50, opacity: 0 }}
-            animate={{ scale: 1, y: 0, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className="absolute top-0 left-0 right-0 h-80 bg-white rounded-3xl shadow-2xl border border-cozy-100 flex flex-col items-center justify-center p-6 select-none cursor-grab active:cursor-grabbing overflow-hidden"
-        >
-            <motion.div style={{ opacity: rightOpacity }} className="absolute inset-0 bg-green-500/10 flex items-center justify-start pl-6 pointer-events-none">
-                <Check size={48} className="text-green-600" />
-            </motion.div>
-            <motion.div style={{ opacity: leftOpacity }} className="absolute inset-0 bg-red-500/10 flex items-center justify-end pr-6 pointer-events-none">
-                <Trash2 size={48} className="text-red-600" />
-            </motion.div>
-
-            <h3 className="text-2xl font-bold text-cozy-900 text-center leading-tight mb-2">{task.content}</h3>
-            {task.dueAt && (
-                <span className="text-xs font-bold uppercase tracking-wider text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full">
-                    {new Date(task.dueAt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-                </span>
-            )}
-            {task.notes && (
-                <p className="mt-4 text-sm text-cozy-500 text-center line-clamp-3">{task.notes}</p>
-            )}
-        </motion.div>
-    );
-};
-
+// --- Minimal Quick Capture Component ---
 export interface QuickCaptureProps {
     forceOpen?: boolean;
     initialContent?: string;
@@ -101,27 +53,10 @@ export const QuickCapture: React.FC<QuickCaptureProps> = ({ forceOpen, initialCo
         }
     }, [initialContent]);
 
-    // Logic to handle forceOpen is tricky with current design as it spawns a different UI for review vs input
-    // The current QuickCapture is a bottom bar.
-    // If we want "forceOpen", we might want to focus the input or show a modal?
-    // Based on ShareHandler design, it seems we want to show it.
-
-
     // Hook for Firestore Actions
     const { addTask } = useTasks();
-    const { stagingItems, deleteStagingItem } = useStaging();
 
-    const currentStagingItem = stagingItems?.[0];
-    const [localTasks, setLocalTasks] = useState<any[]>([]);
-
-    useEffect(() => {
-        if (currentStagingItem) {
-            setLocalTasks(currentStagingItem.tasks);
-            hapticImpact.success();
-        } else {
-            setLocalTasks([]);
-        }
-    }, [currentStagingItem]);
+    // Removed Staging Logic from here - now it's just "Fire and Forget" to the Inbox!
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
@@ -149,7 +84,7 @@ export const QuickCapture: React.FC<QuickCaptureProps> = ({ forceOpen, initialCo
         setInput('');
     };
 
-    // --- Voice Logic (Unchanged except logic flow) ---
+    // --- Voice Logic ---
     const toggleListening = async () => {
         if (isListening) {
             stopListening();
@@ -170,9 +105,14 @@ export const QuickCapture: React.FC<QuickCaptureProps> = ({ forceOpen, initialCo
                 const mimeType = recorder.mimeType || 'audio/webm';
                 const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
                 stream.getTracks().forEach(t => t.stop());
-                const context = currentStagingItem ? localTasks : [];
-                processVoiceMemo(audioBlob, context);
+
+                // Fire and forget to AI logic
+                processVoiceMemo(audioBlob);
                 hapticImpact.success();
+
+                // Show a toast or notification? 
+                // For now, minimizing the capture sheet is good feedback.
+                if (onClose) onClose();
             };
             recorder.start();
             mediaRecorderRef.current = recorder;
@@ -191,112 +131,6 @@ export const QuickCapture: React.FC<QuickCaptureProps> = ({ forceOpen, initialCo
         }
     };
 
-    // --- Review Logic ---
-    const handleSwipe = async (direction: 'left' | 'right') => {
-        if (localTasks.length === 0) return;
-        const currentTask = localTasks[0];
-
-        if (direction === 'right') {
-            hapticImpact.success();
-            // FIRESTORE WRITE
-            await addTask({
-                content: currentTask.content,
-                status: currentTask.dueAt ? TaskStatus.TODAY : TaskStatus.INBOX,
-                dueAt: currentTask.dueAt,
-                responsible: currentTask.responsible,
-                notes: currentTask.notes,
-                source: 'voice' as const
-            });
-        } else {
-            hapticImpact.light();
-        }
-
-        const newStack = localTasks.slice(1);
-        setLocalTasks(newStack);
-
-        if (newStack.length === 0 && currentStagingItem?.id) {
-            await deleteStagingItem(currentStagingItem.id);
-        }
-    };
-
-    const handleCloseReview = async () => {
-        if (currentStagingItem?.id) {
-            await deleteStagingItem(currentStagingItem.id);
-        }
-    };
-
-    // ... (Render Logic remains largely same, just using new handlers)
-
-    if (currentStagingItem) {
-        return (
-            <div className="fixed inset-0 z-50 bg-white/95 backdrop-blur-xl flex flex-col pt-20 pb-8 px-6 animate-in fade-in duration-300">
-                <div className="mb-8 text-center">
-                    <div className="inline-flex items-center justify-center p-3 bg-indigo-100 text-indigo-600 rounded-full mb-4">
-                        <Sparkles size={24} />
-                    </div>
-                    <h2 className="text-xl font-bold text-cozy-900 mb-2">{currentStagingItem.summary}</h2>
-                    {localTasks.length > 0 && (
-                        <p className="text-cozy-500 text-sm">Swipe <b>Right</b> to keep, <b>Left</b> to discard.</p>
-                    )}
-                </div>
-
-                <div className="flex-1 relative w-full max-w-sm mx-auto min-h-[350px]">
-                    <AnimatePresence>
-                        {localTasks.map((task, index) => (
-                            <ReviewCard
-                                key={task.id || index}
-                                task={task}
-                                index={index}
-                                onSwipe={handleSwipe}
-                            />
-                        )).reverse()}
-                    </AnimatePresence>
-                    {localTasks.length === 0 && (
-                        <div className="absolute inset-0 flex items-center justify-center text-cozy-400">
-                            All done!
-                        </div>
-                    )}
-                </div>
-
-                <div className="mt-8 flex items-center justify-center gap-6">
-                    <button onClick={handleCloseReview} className="p-4 rounded-full bg-cozy-100 text-cozy-600 hover:bg-cozy-200 transition-colors">
-                        <X size={24} />
-                    </button>
-                    {/* Refinement UI */}
-                    <div className="flex-1 max-w-xs relative group">
-                        <form
-                            onSubmit={(e) => {
-                                e.preventDefault();
-                                if (!input.trim()) return;
-                                const text = input;
-                                setInput('');
-                                setLocalTasks([]); // Clear to show loading state effectively or just keep old ones?
-                                // Actually, better UX might be to show a loading state overlay.
-                                // For now, let's just trigger the process.
-                                import('../services/aiProcessor').then(({ processTextRefinement }) => {
-                                    processTextRefinement(text, localTasks);
-                                    hapticImpact.medium();
-                                });
-                            }}
-                            className="relative flex items-center"
-                        >
-                            <input
-                                type="text"
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                placeholder="Refine... e.g. 'Make it due tomorrow'"
-                                className="w-full py-3 px-4 pr-10 rounded-2xl bg-cozy-50 border border-cozy-200 focus:border-indigo-500 outline-none text-sm transition-all"
-                            />
-                            <button type="submit" disabled={!input.trim()} className="absolute right-2 p-1.5 text-indigo-600 disabled:opacity-30 hover:bg-indigo-50 rounded-lg transition-colors">
-                                <Send size={16} />
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
     if (isListening) {
         return (
             <div className="fixed inset-0 z-50 bg-indigo-600/90 backdrop-blur-md flex flex-col items-center justify-center text-white animate-in fade-in duration-200">
@@ -308,7 +142,7 @@ export const QuickCapture: React.FC<QuickCaptureProps> = ({ forceOpen, initialCo
                     <Mic size={48} />
                 </motion.div>
                 <h2 className="text-2xl font-bold mb-2">Listening...</h2>
-                <p className="text-white/70">Tap stop to analyze in background.</p>
+                <p className="text-white/70">Tap stop to analyze in Background.</p>
 
                 <button onClick={toggleListening} className="mt-12 p-4 bg-white text-indigo-600 rounded-full shadow-lg active:scale-95 transition-transform">
                     <StopCircle size={32} />

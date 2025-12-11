@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { db, auth } from '../lib/firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { StagingItem } from '../types';
 
 // Helper: Blob to Base64
@@ -22,17 +22,48 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
 // Unified Processing Helper
 const processWithGemini = async (
   input: { type: 'audio', data: Blob } | { type: 'text', data: string },
-  contextTasks: any[] = []
+  contextTasks: any[] = [],
+  existingStagingId?: string
 ) => {
   const isRefinement = contextTasks.length > 0;
 
-  // Request notification permission if not already granted
-  if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-    Notification.requestPermission();
-  }
+  // 1. Get API Key from LocalStorage
+  const apiKey = localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY; // Fallback to env if needed for dev
+
+  if (!auth.currentUser) return;
+
+  // 2. Create or Update Staging Doc to "Processing"
+  let docId = existingStagingId;
 
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    if (!docId) {
+      // Create new doc
+      const docRef = await addDoc(collection(db, 'staging'), {
+        createdAt: Date.now(),
+        summary: "Processing voice memo...",
+        status: 'processing',
+        tasks: [],
+        ownerId: auth.currentUser.uid
+      } as StagingItem);
+      docId = docRef.id;
+    } else {
+      // Update existing (for refinement)
+      await updateDoc(doc(db, 'staging', docId), {
+        status: 'processing',
+        summary: "Refining tasks..."
+      });
+    }
+
+    if (!apiKey) {
+      throw new Error("Missing Gemini API Key. Please add it in Settings.");
+    }
+
+    // Request notification permission if not already granted
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
     const now = new Date();
 
     let userPromptPart;
@@ -104,9 +135,10 @@ const processWithGemini = async (
     const result = JSON.parse(response.text || '{}');
 
     if (result.tasks) {
-      const stagingItem: StagingItem = {
-        createdAt: Date.now(),
-        summary: result.summary || "Processed",
+      // 3. Update Doc with Success
+      await updateDoc(doc(db, 'staging', docId!), {
+        status: 'ready',
+        summary: result.summary || "Ready for review",
         tasks: result.tasks.map((t: any) => ({
           id: Math.random().toString(36).substr(2, 9),
           content: t.content,
@@ -114,14 +146,7 @@ const processWithGemini = async (
           responsible: t.responsible,
           notes: t.notes
         }))
-      };
-
-      if (auth.currentUser) {
-        await addDoc(collection(db, 'staging'), {
-          ...stagingItem,
-          ownerId: auth.currentUser.uid
-        });
-      }
+      });
 
       // Trigger Notification
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden) {
@@ -132,8 +157,16 @@ const processWithGemini = async (
       }
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("AI Processing Error", error);
+    // 4. Update Doc with Error
+    if (docId) {
+      await updateDoc(doc(db, 'staging', docId), {
+        status: 'error',
+        summary: "Failed to process",
+        error: error.message || "Unknown AI error"
+      });
+    }
   }
 };
 
@@ -141,6 +174,6 @@ export const processVoiceMemo = async (audioBlob: Blob, contextTasks: any[] = []
   return processWithGemini({ type: 'audio', data: audioBlob }, contextTasks);
 };
 
-export const processTextRefinement = async (text: string, contextTasks: any[]) => {
-  return processWithGemini({ type: 'text', data: text }, contextTasks);
+export const processTextRefinement = async (text: string, contextTasks: any[], stagingId: string) => {
+  return processWithGemini({ type: 'text', data: text }, contextTasks, stagingId);
 };
