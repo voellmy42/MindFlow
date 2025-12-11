@@ -28,7 +28,7 @@ export interface Task {
   status: TaskStatus;
   createdAt: number;
   dueAt?: number;
-  source?: 'manual' | 'share' | 'recipe';
+  source?: 'manual' | 'share' | 'recipe' | 'voice';
   responsible?: string;
   notes?: string;
   ownerId?: string; // For syncing/sharing

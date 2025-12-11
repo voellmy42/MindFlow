@@ -19,18 +19,34 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
   });
 };
 
-export const processVoiceMemo = async (audioBlob: Blob, contextTasks: any[] = []) => {
+// Unified Processing Helper
+const processWithGemini = async (
+  input: { type: 'audio', data: Blob } | { type: 'text', data: string },
+  contextTasks: any[] = []
+) => {
   const isRefinement = contextTasks.length > 0;
 
   // Request notification permission if not already granted
-  if (Notification.permission === 'default') {
+  if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
     Notification.requestPermission();
   }
 
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const now = new Date();
-    const base64Audio = await blobToBase64(audioBlob);
+
+    let userPromptPart;
+    if (input.type === 'audio') {
+      const base64Audio = await blobToBase64(input.data);
+      userPromptPart = {
+        inlineData: {
+          mimeType: input.data.type || 'audio/webm',
+          data: base64Audio
+        }
+      };
+    } else {
+      userPromptPart = { text: `User Refinement Instruction: "${input.data}"` };
+    }
 
     const systemPrompt = `
       Current Date: ${now.toString()}.
@@ -39,14 +55,14 @@ export const processVoiceMemo = async (audioBlob: Blob, contextTasks: any[] = []
       Existing Context (JSON): ${JSON.stringify(contextTasks)}
       
       Instructions:
-      1. Analyze the user's input (Audio).
+      1. Analyze the user's input (${input.type}).
       2. If New Capture: Extract tasks.
-      3. If Refinement: Modify the "Existing Context" list based on user instructions.
-      4. Return the Final List of tasks.
+      3. If Refinement: Modify the "Existing Context" list based on user instructions. You can add, remove, or update properties of tasks.
+      4. Return the Final complete List of tasks.
       
       Output JSON Schema:
       {
-          "summary": "Brief, friendly text summary (e.g. 'Found 3 tasks' or 'Updated time').",
+          "summary": "Brief, friendly text summary (e.g. 'Found 3 tasks' or 'Updated to due tomorrow').",
           "tasks": [
               { "content": "Actionable Title", "dueAt": "ISO Date String or null", "responsible": "Name or null", "notes": "Details" }
           ]
@@ -80,12 +96,7 @@ export const processVoiceMemo = async (audioBlob: Blob, contextTasks: any[] = []
       contents: {
         parts: [
           { text: systemPrompt },
-          {
-            inlineData: {
-              mimeType: audioBlob.type || 'audio/webm',
-              data: base64Audio
-            }
-          }
+          userPromptPart
         ]
       }
     });
@@ -95,7 +106,7 @@ export const processVoiceMemo = async (audioBlob: Blob, contextTasks: any[] = []
     if (result.tasks) {
       const stagingItem: StagingItem = {
         createdAt: Date.now(),
-        summary: result.summary || "Processed voice memo",
+        summary: result.summary || "Processed",
         tasks: result.tasks.map((t: any) => ({
           id: Math.random().toString(36).substr(2, 9),
           content: t.content,
@@ -105,8 +116,6 @@ export const processVoiceMemo = async (audioBlob: Blob, contextTasks: any[] = []
         }))
       };
 
-      // If refinement, we might want to update an existing staging item, but for now we append new results.
-      // A more complex app would manage session IDs. Here, we just add to the queue.
       if (auth.currentUser) {
         await addDoc(collection(db, 'staging'), {
           ...stagingItem,
@@ -115,16 +124,23 @@ export const processVoiceMemo = async (audioBlob: Blob, contextTasks: any[] = []
       }
 
       // Trigger Notification
-      if (Notification.permission === 'granted' && document.hidden) {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden) {
         new Notification("MindFlow", {
           body: `${result.summary}`,
-          icon: '/icon-192.png' // Assumes manifest icon path
+          icon: '/icon-192.png'
         });
       }
     }
 
   } catch (error) {
     console.error("AI Processing Error", error);
-    // Optionally save an error state to DB so UI can show it
   }
+};
+
+export const processVoiceMemo = async (audioBlob: Blob, contextTasks: any[] = []) => {
+  return processWithGemini({ type: 'audio', data: audioBlob }, contextTasks);
+};
+
+export const processTextRefinement = async (text: string, contextTasks: any[]) => {
+  return processWithGemini({ type: 'text', data: text }, contextTasks);
 };

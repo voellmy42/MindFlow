@@ -205,7 +205,7 @@ export const QuickCapture: React.FC<QuickCaptureProps> = ({ forceOpen, initialCo
                 dueAt: currentTask.dueAt,
                 responsible: currentTask.responsible,
                 notes: currentTask.notes,
-                source: 'recipe' as const // or voice
+                source: 'voice' as const
             });
         } else {
             hapticImpact.light();
@@ -262,9 +262,36 @@ export const QuickCapture: React.FC<QuickCaptureProps> = ({ forceOpen, initialCo
                     <button onClick={handleCloseReview} className="p-4 rounded-full bg-cozy-100 text-cozy-600 hover:bg-cozy-200 transition-colors">
                         <X size={24} />
                     </button>
-                    <button onClick={toggleListening} className="p-6 rounded-full bg-indigo-600 text-white shadow-xl shadow-indigo-200 active:scale-90 transition-transform">
-                        <Mic2 size={32} />
-                    </button>
+                    {/* Refinement UI */}
+                    <div className="flex-1 max-w-xs relative group">
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                if (!input.trim()) return;
+                                const text = input;
+                                setInput('');
+                                setLocalTasks([]); // Clear to show loading state effectively or just keep old ones?
+                                // Actually, better UX might be to show a loading state overlay.
+                                // For now, let's just trigger the process.
+                                import('../services/aiProcessor').then(({ processTextRefinement }) => {
+                                    processTextRefinement(text, localTasks);
+                                    hapticImpact.medium();
+                                });
+                            }}
+                            className="relative flex items-center"
+                        >
+                            <input
+                                type="text"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                placeholder="Refine... e.g. 'Make it due tomorrow'"
+                                className="w-full py-3 px-4 pr-10 rounded-2xl bg-cozy-50 border border-cozy-200 focus:border-indigo-500 outline-none text-sm transition-all"
+                            />
+                            <button type="submit" disabled={!input.trim()} className="absolute right-2 p-1.5 text-indigo-600 disabled:opacity-30 hover:bg-indigo-50 rounded-lg transition-colors">
+                                <Send size={16} />
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
         );
