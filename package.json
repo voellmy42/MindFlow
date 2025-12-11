@@ -6,22 +6,24 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "deploy": "npm run build && firebase deploy --only hosting",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.32.0",
     "dexie": "^4.2.1",
+    "dexie-react-hooks": "^4.2.0",
+    "firebase": "^12.6.0",
     "framer-motion": "^12.23.26",
+    "lucide-react": "^0.556.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
-    "react-router-dom": "^7.10.1",
-    "lucide-react": "^0.556.0",
-    "dexie-react-hooks": "^4.2.0",
-    "@google/genai": "^1.32.0",
-    "firebase": "^12.6.0"
+    "react-router-dom": "^7.10.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "firebase-tools": "^15.0.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }
