@@ -35,7 +35,7 @@ const Card: React.FC<{ task: Task; onSwipe: (dir: 'left' | 'right' | 'down') => 
       dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
       onDragEnd={handleDragEnd}
       whileTap={{ scale: 1.05, cursor: 'grabbing' }}
-      className="absolute top-0 w-full h-full max-h-[60vh] aspect-[3/4] bg-white rounded-3xl shadow-xl border border-cozy-100 flex flex-col items-center justify-center p-8 select-none cursor-grab overflow-hidden"
+      className="absolute top-0 w-full h-full max-h-[60vh] aspect-[3/4] bg-white rounded-[2rem] shadow-2xl shadow-cozy-900/10 border border-white/50 flex flex-col items-center justify-center p-8 select-none cursor-grab overflow-hidden"
     >
       <motion.div style={{ opacity: rightOpacity }} className="absolute inset-0 bg-green-500/20 pointer-events-none flex items-center justify-center">
         <Check size={80} className="text-green-600 translate-x-12" />

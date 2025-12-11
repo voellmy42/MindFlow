@@ -24,7 +24,7 @@ const TaskItem: React.FC<{ task: any, onSelect: (t: Task) => void, onComplete: (
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className="flex items-center gap-4 py-4 border-b border-cozy-100 group"
+      className="flex items-center gap-4 py-4 px-4 -mx-4 rounded-2xl transition-all hover:bg-white hover:shadow-sm hover:scale-[1.01] group border-b border-cozy-100/50 last:border-0"
     >
       <button onClick={handleComplete} className="text-cozy-300 hover:text-green-500 transition-colors shrink-0">
         <Circle size={24} />

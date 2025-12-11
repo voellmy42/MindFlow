@@ -270,7 +270,7 @@ const ListDetailView = ({ list, onClose, onDelete, onShare }: { list: any, onClo
             <div className="flex-1 overflow-y-auto px-6 py-4 pb-32">
                 <div className="space-y-3">
                     {displayTasks.map((task: any) => (
-                        <div key={task.id} className="bg-white rounded-2xl shadow-sm border border-cozy-100 flex items-center gap-3 p-4 group active:scale-[0.99] transition-all">
+                        <div key={task.id} className="bg-white rounded-[1.2rem] shadow-sm shadow-cozy-900/5 border border-cozy-100 flex items-center gap-3 p-4 group active:scale-[0.99] transition-all hover:border-cozy-200">
                             <button onClick={(e) => { e.stopPropagation(); toggleTask(task.id); }} className="p-2 -m-2 text-cozy-300 hover:text-green-500 shrink-0">
                                 <Circle size={24} strokeWidth={1.5} />
                             </button>

@@ -325,7 +325,7 @@ export const QuickCapture: React.FC<QuickCaptureProps> = ({ forceOpen, initialCo
                         initial={{ opacity: 0, y: 10, scale: 0.9 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.9 }}
-                        className="absolute -top-10 left-4 bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg flex items-center gap-2 z-10"
+                        className="absolute -top-12 left-6 bg-indigo-600/90 backdrop-blur text-white px-4 py-2 rounded-2xl text-xs font-bold shadow-xl shadow-indigo-500/20 flex items-center gap-2 z-10"
                     >
                         <CalendarDays size={14} className="text-indigo-200" />
                         {detectedDate.label}
@@ -335,24 +335,29 @@ export const QuickCapture: React.FC<QuickCaptureProps> = ({ forceOpen, initialCo
 
             <form
                 onSubmit={handleManualSubmit}
-                className="relative flex items-center bg-white shadow-2xl rounded-2xl overflow-hidden border border-cozy-200"
+                className="relative flex items-center bg-white/80 backdrop-blur-2xl shadow-2xl shadow-cozy-900/10 rounded-[2rem] overflow-hidden border border-white/50 ring-1 ring-cozy-900/5 group transition-all hover:scale-[1.01]"
             >
-                <button type="button" onClick={toggleListening} className="p-4 text-indigo-600 hover:bg-indigo-50 transition-colors border-r border-cozy-100">
-                    <Mic size={20} />
+                <button
+                    type="button"
+                    onClick={toggleListening}
+                    className="p-5 text-indigo-600 hover:bg-indigo-50/50 transition-colors border-r border-cozy-100 flex-shrink-0 relative"
+                >
+                    <div className="absolute inset-0 bg-indigo-100/30 animate-pulse-slow rounded-full m-2"></div>
+                    <Mic size={22} className="relative z-10" />
                 </button>
 
                 <input
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Quick capture..."
+                    placeholder="Capture thought..."
                     autoFocus={!!forceOpen} // Auto focus if forced open
-                    className="w-full py-4 px-4 text-lg bg-transparent outline-none placeholder:text-cozy-300 text-cozy-800"
+                    className="w-full py-5 px-4 text-lg bg-transparent outline-none placeholder:text-cozy-400 text-cozy-800 font-medium"
                 />
 
-                <div className="absolute right-2">
+                <div className="absolute right-3">
                     {input ? (
-                        <button type="submit" className="p-2 bg-cozy-900 text-white rounded-xl active:scale-90 transition-all shadow-md">
+                        <button type="submit" className="p-3 bg-cozy-900 text-white rounded-xl active:scale-90 transition-all shadow-lg hover:shadow-xl">
                             <Send size={20} />
                         </button>
                     ) : null}
