@@ -67,7 +67,7 @@ const CreateListModal = ({ onClose }: { onClose: () => void }) => {
 
 const ShareListModal = ({ list, onClose }: { list: any, onClose: () => void }) => {
     const [copied, setCopied] = useState(false);
-    const shareUrl = `${window.location.origin}/join/${list.sharedId || list.id}`; // Mock URL
+    const shareUrl = `${window.location.origin}/join/${list.sharedId || list.id}`;
 
     const handleCopy = () => {
         navigator.clipboard.writeText(shareUrl);
@@ -80,7 +80,7 @@ const ShareListModal = ({ list, onClose }: { list: any, onClose: () => void }) =
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold text-cozy-900">Share List</h3>
+                    <h3 className="text-xl font-bold text-cozy-900">Share "{list.name}"</h3>
                     <button onClick={onClose} className="p-2 bg-cozy-50 rounded-full text-cozy-600">
                         <X size={20} />
                     </button>
@@ -108,7 +108,7 @@ const ShareListModal = ({ list, onClose }: { list: any, onClose: () => void }) =
     );
 }
 
-const ListDetailView = ({ list, onClose }: { list: any, onClose: () => void }) => {
+const ListDetailView = ({ list, onClose, onDelete, onShare }: { list: any, onClose: () => void, onDelete: () => void, onShare: () => void }) => {
     const [input, setInput] = useState('');
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     // Pass listId to filter tasks for this specific list
@@ -133,12 +133,23 @@ const ListDetailView = ({ list, onClose }: { list: any, onClose: () => void }) =
         <div className="fixed inset-0 z-[100] bg-cozy-50 flex flex-col h-[100dvh] animate-in slide-in-from-right duration-300">
             {/* Header */}
             <div className={`shrink-0 ${list.color} px-6 pt-6 pb-6`}>
-                <button onClick={onClose} className="p-3 rounded-full hover:bg-black/5 text-cozy-900">
-                    <ChevronLeft size={28} />
-                </button>
-                {/* Share Button logic will be handled by parent content or a separate local state if we want to trigger it from here */}
+                <div className="flex justify-between items-center">
+                    <button onClick={onClose} className="p-3 rounded-full hover:bg-black/5 text-cozy-900 transition-colors">
+                        <ChevronLeft size={28} />
+                    </button>
+                    <div className="flex gap-2">
+                        <button onClick={onShare} className="p-3 rounded-full hover:bg-black/5 text-cozy-900 transition-colors">
+                            <Share2 size={24} />
+                        </button>
+                        {list.role === 'owner' && (
+                            <button onClick={onDelete} className="p-3 rounded-full hover:bg-red-500/20 hover:text-red-900 text-cozy-900 transition-colors">
+                                <Trash2 size={24} />
+                            </button>
+                        )}
+                    </div>
+                </div>
             </div>
-            <h1 className="text-4xl font-extrabold text-cozy-900 leading-tight">{list.name}</h1>
+            <h1 className="text-4xl font-extrabold text-cozy-900 leading-tight px-6 pt-2">{list.name}</h1>
             <p className="text-cozy-900/60 font-bold text-sm mt-1 uppercase tracking-wide opacity-80">
                 {displayTasks.length} Items
             </p>
@@ -189,7 +200,7 @@ const ListDetailView = ({ list, onClose }: { list: any, onClose: () => void }) =
 };
 
 export const Lists = () => {
-    const { lists } = useLists();
+    const { lists, deleteList } = useLists();
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [isCreating, setIsCreating] = useState(false);
     const [activeList, setActiveList] = useState<any | null>(null);
@@ -286,7 +297,20 @@ export const Lists = () => {
 
             <AnimatePresence>
                 {isCreating && <CreateListModal onClose={() => setIsCreating(false)} />}
-                {activeList && <ListDetailView list={activeList} onClose={() => setActiveList(null)} />}
+                {activeList && (
+                    <ListDetailView
+                        list={activeList}
+                        onClose={() => setActiveList(null)}
+                        onDelete={async () => {
+                            if (window.confirm('Are you sure you want to delete this list?')) {
+                                hapticImpact.heavy();
+                                await deleteList(activeList.id);
+                                setActiveList(null);
+                            }
+                        }}
+                        onShare={() => setSharingList(activeList)}
+                    />
+                )}
                 {sharingList && <ShareListModal list={sharingList} onClose={() => setSharingList(null)} />}
             </AnimatePresence>
         </div>

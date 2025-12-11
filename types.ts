@@ -17,6 +17,7 @@ export interface List {
   createdAt: number;
   role?: 'owner' | 'editor'; // 'owner' can delete list, 'editor' can only edit content
   sharedWith?: string[]; // Array of user IDs or emails who have access
+  ownerId?: string;
   lastSyncedAt?: number;
 }
 
@@ -40,6 +41,7 @@ export interface Recipe {
   template: string; // e.g., "Pack for {days} days to {location}"
   taskTemplates: string[]; // e.g., ["Buy ticket to {location}", "Pack {days} pairs of socks"]
   color: string;
+  sharedId?: string; // Unique UUID for sharing
   ownerId?: string; // For syncing/sharing
 }
 

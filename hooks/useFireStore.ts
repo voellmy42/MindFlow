@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase';
-import { collection, query, where, onSnapshot, doc, addDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, addDoc, updateDoc, deleteDoc, writeBatch, arrayUnion, getDocs, limit } from 'firebase/firestore';
 import { List, Task, TaskStatus } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -18,41 +18,48 @@ export const useLists = () => {
       return;
     }
 
-    // Query specifically for lists owned by the user OR shared with the user
-    // To avoid complex indexes, we'll just query for owned lists for now and sort client-side.
-    // If we wanted shared lists, we'd need a separate listener or an OR query, 
-    // but OR queries often require indexes too. 
-    // For this "fix", we prioritizing getting the basic list creation working without index errors.
-    const q = query(
-      collection(db, 'lists'),
-      where('ownerId', '==', user.id)
-    );
+    // Two active listeners merged to avoid complex "OR" index requirements
+    const ownedQ = query(collection(db, 'lists'), where('ownerId', '==', user.id));
+    const sharedQ = query(collection(db, 'lists'), where('sharedWith', 'array-contains', user.id));
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const listData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      // Client-side sort
-      listData.sort((a, b) => a.createdAt - b.createdAt);
-      setLists(listData);
+    let ownedLists: List[] = [];
+    let sharedLists: List[] = [];
+
+    const updateState = () => {
+      const all = [...ownedLists, ...sharedLists];
+      // Deduplicate just in case
+      const unique = Array.from(new Map(all.map(item => [item.id, item])).values());
+      unique.sort((a, b) => a.createdAt - b.createdAt);
+      setLists(unique);
       setLoading(false);
+    };
+
+    const unsubOwned = onSnapshot(ownedQ, (snapshot) => {
+      ownedLists = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), role: 'owner' } as List));
+      updateState();
     });
-    return () => unsubscribe();
+
+    const unsubShared = onSnapshot(sharedQ, (snapshot) => {
+      sharedLists = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), role: 'editor' } as List));
+      updateState();
+    });
+
+    return () => {
+      unsubOwned();
+      unsubShared();
+    };
   }, [user]);
 
   const addList = async (list: Partial<List>) => {
-    if (!auth.currentUser) {
-      console.error("addList: No authenticated user");
-      return;
-    }
-    console.log("addList: Creating list", { list, ownerId: auth.currentUser.uid });
+    if (!auth.currentUser) return;
     try {
       await addDoc(collection(db, 'lists'), {
         ...list,
         ownerId: auth.currentUser.uid,
         createdAt: Date.now(),
         sharedId: crypto.randomUUID(),
-        sharedWith: [] // Initialize empty sharedWith array
+        sharedWith: []
       });
-      console.log("addList: Success");
     } catch (e) {
       console.error("addList: Failed", e);
       throw e;
@@ -60,26 +67,49 @@ export const useLists = () => {
   };
 
   const deleteList = async (listId: string) => {
-    // Delete list and all associated tasks
-    const batch = writeBatch(db);
     const listRef = doc(db, 'lists', listId);
-    batch.delete(listRef);
-
-    // Find tasks linked to this list
-    // Note: For large collections, this should be done via Cloud Functions
-    const tasksQ = query(collection(db, 'tasks'), where('listId', '==', listId));
-    // We can't await inside batch synchronously easily without fetching, 
-    // so for client-side we'll just delete the list ref and let tasks be orphaned or handle separately
-    // A better way is to fetch then batch delete
-    batch.delete(listRef);
-    await batch.commit();
+    await deleteDoc(listRef);
+    // Note: Tasks are orphaned on client side delete for now, 
+    // ideally use cloud function or batch delete tasks here.
   };
 
   const updateList = async (listId: string, updates: Partial<List>) => {
     await updateDoc(doc(db, 'lists', listId), updates);
   };
 
-  return { lists, loading, addList, deleteList, updateList };
+  const joinList = async (sharedId: string) => {
+    if (!auth.currentUser) throw new Error("Not authenticated");
+
+    // Find list by sharedId
+    const q = query(collection(db, 'lists'), where('sharedId', '==', sharedId), limit(1));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      throw new Error("List not found or invalid link");
+    }
+
+    const listDoc = snapshot.docs[0];
+    const listData = listDoc.data() as List;
+
+    // Check if owner
+    if (listData.ownerId === auth.currentUser.uid) {
+      return { listId: listDoc.id, alreadyJoined: true };
+    }
+
+    // Check if already shared
+    if (listData.sharedWith?.includes(auth.currentUser.uid)) {
+      return { listId: listDoc.id, alreadyJoined: true };
+    }
+
+    // Add user to sharedWith
+    await updateDoc(doc(db, 'lists', listDoc.id), {
+      sharedWith: arrayUnion(auth.currentUser.uid)
+    });
+
+    return { listId: listDoc.id, alreadyJoined: false };
+  };
+
+  return { lists, loading, addList, deleteList, updateList, joinList };
 };
 
 // --- TASKS HOOK ---
@@ -229,7 +259,8 @@ export const useRecipes = () => {
     await addDoc(collection(db, 'recipes'), {
       ...recipe,
       ownerId: auth.currentUser.uid,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      sharedId: crypto.randomUUID()
     });
   };
 

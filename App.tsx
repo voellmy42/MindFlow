@@ -7,6 +7,7 @@ import { Triage } from './pages/Triage';
 import { Lists } from './pages/Lists';
 import { AllTasks } from './pages/AllTasks';
 import { Login } from './pages/Login';
+import { Join } from './pages/Join';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { db } from './lib/firebase'; // Firestore
@@ -86,6 +87,7 @@ const AppContent = () => {
             <Route path="/triage" element={<Triage />} />
             <Route path="/lists" element={<Lists />} />
             <Route path="/all" element={<AllTasks />} />
+            <Route path="/join/:sharedId" element={<Join />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <Navigation />

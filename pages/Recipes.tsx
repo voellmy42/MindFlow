@@ -2,8 +2,51 @@ import React, { useState } from 'react';
 import { useRecipes, useTasks } from '../hooks/useFireStore';
 import { Recipe, TaskStatus } from '../types';
 import { hapticImpact } from '../services/haptics';
-import { Plus, X, Trash2, Calendar, Check, ArrowRight, Play } from 'lucide-react';
+import { Share2, Plus, X, Trash2, Calendar, Check, ArrowRight, Play, CheckSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const ShareRecipeModal = ({ recipe, onClose }: { recipe: Recipe, onClose: () => void }) => {
+  const [copied, setCopied] = useState(false);
+  const shareUrl = `${window.location.origin}/join/${recipe.sharedId || recipe.id}`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    hapticImpact.success();
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-cozy-900">Share "{recipe.name}"</h3>
+          <button onClick={onClose} className="p-2 bg-cozy-50 rounded-full text-cozy-600">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-4 bg-cozy-50 rounded-2xl mb-4 border border-cozy-100 flex items-center justify-center py-8">
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold ${recipe.color}`}>
+            <Share2 size={32} />
+          </div>
+        </div>
+
+        <p className="text-center text-cozy-600 font-medium mb-6">
+          Invite others to use <br /> <span className="text-cozy-900 font-bold">"{recipe.name}"</span>
+        </p>
+
+        <button
+          onClick={handleCopy}
+          className="w-full py-4 bg-cozy-900 text-white rounded-2xl font-bold text-lg shadow-md flex items-center justify-center gap-2 active:scale-95 transition-transform"
+        >
+          {copied ? <CheckSquare size={20} /> : <Share2 size={20} />}
+          {copied ? 'Copied Link!' : 'Copy Recipe Link'}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // --- Constants ---
 const COLORS = [
@@ -146,7 +189,7 @@ const CreateRecipeModal = ({ onClose }: { onClose: () => void }) => {
   );
 };
 
-const RunRecipeModal = ({ recipe, onClose }: { recipe: Recipe; onClose: () => void }) => {
+const RunRecipeModal = ({ recipe, onClose, onShare }: { recipe: Recipe; onClose: () => void; onShare: () => void }) => {
   const variables = extractVariables(recipe.taskTemplates);
   const hasVariables = variables.length > 0;
 
@@ -211,6 +254,9 @@ const RunRecipeModal = ({ recipe, onClose }: { recipe: Recipe; onClose: () => vo
           <div className="flex gap-2">
             <button onClick={handleDelete} className="p-2 bg-red-50 rounded-full text-red-500 hover:bg-red-100 transition-colors">
               <Trash2 size={20} />
+            </button>
+            <button onClick={onShare} className="p-2 bg-cozy-50 rounded-full text-cozy-600 hover:bg-cozy-100 transition-colors">
+              <Share2 size={20} />
             </button>
             <button onClick={onClose} className="p-2 bg-cozy-50 rounded-full text-cozy-400 hover:bg-cozy-100 transition-colors">
               <X size={20} />
@@ -281,6 +327,7 @@ export const Recipes = () => {
   const { recipes, loading } = useRecipes();
   const [isCreating, setIsCreating] = useState(false);
   const [activeRecipe, setActiveRecipe] = useState<Recipe | null>(null);
+  const [sharingRecipe, setSharingRecipe] = useState<Recipe | null>(null);
 
   return (
     <div className="pb-24">
@@ -332,7 +379,14 @@ export const Recipes = () => {
       {/* Modals */}
       <AnimatePresence>
         {isCreating && <CreateRecipeModal onClose={() => setIsCreating(false)} />}
-        {activeRecipe && <RunRecipeModal recipe={activeRecipe} onClose={() => setActiveRecipe(null)} />}
+        {activeRecipe && (
+          <RunRecipeModal
+            recipe={activeRecipe}
+            onClose={() => setActiveRecipe(null)}
+            onShare={() => setSharingRecipe(activeRecipe)}
+          />
+        )}
+        {sharingRecipe && <ShareRecipeModal recipe={sharingRecipe} onClose={() => setSharingRecipe(null)} />}
       </AnimatePresence>
     </div>
   );
