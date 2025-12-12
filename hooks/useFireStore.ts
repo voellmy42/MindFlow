@@ -140,26 +140,22 @@ export const useTasks = (config?: {
     else if (config?.status) {
       constraints.push(where('status', '==', config.status));
     }
-    // "Inbox" logic: No listId AND status is INBOX (or just no listId depending on your logic)
-    // For this app: Inbox = status INBOX.
 
-    // Exclude deleted (common pattern)
+    // Exclude deleted implementation...
     if (config?.excludeDeleted !== false) {
-      // Note: Firestore doesn't support != queries easily mixed with others.
-      // It's often easier to filter DELETED on client side if querying complex ranges,
-      // OR ensure we only query for active statuses.
+      // ...
     }
 
-    // Default filters
-    // Security/Logic: Only enforce ownerId if we are NOT looking at a specific list.
-    // If we are looking at a specific list, we want to see ALL tasks in that list, regardless of owner.
-    // (Access control should ideally be handled by Firestore Security Rules checking list membership)
+    // Security/Logic: MUTUALLY EXCLUSIVE SCOPES
+    // 1. If we are in a LIST (listId provided), we query strictly by that listId.
+    //    We do NOT filter by ownerId, so everyone sees everyone's tasks.
+    // 2. If we are NOT in a list (e.g. Inbox, All Tasks), we default to ownerId == user.id
+    //    to show only the user's private/owned tasks.
     if (!config?.listId) {
       constraints.push(where('ownerId', '==', user.id));
     }
 
-    // REMOVED orderBy to prevent "missing index" errors during dev
-    // constraints.push(orderBy('createdAt', 'desc'));
+    console.log("useTasks Query Constraints:", { listId: config?.listId, constraints: constraints.length });
 
     const q = query(tasksRef, ...constraints);
 
