@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase';
-import { collection, query, where, onSnapshot, doc, addDoc, updateDoc, deleteDoc, writeBatch, arrayUnion, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, addDoc, updateDoc, deleteDoc, writeBatch, arrayUnion, getDocs, limit, deleteField } from 'firebase/firestore';
 import { List, Task, TaskStatus } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -212,9 +212,13 @@ export const useTasks = (config?: {
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
     console.log("updateTask: Updating", { taskId, updates });
     try {
-      // Sanitize updates object to remove undefined values
       const cleanUpdates = { ...updates };
-      Object.keys(cleanUpdates).forEach(key => (cleanUpdates as any)[key] === undefined && delete (cleanUpdates as any)[key]);
+      // Replace undefined with deleteField() to properly unset fields in Firestore
+      Object.keys(cleanUpdates).forEach(key => {
+        if ((cleanUpdates as any)[key] === undefined) {
+          (cleanUpdates as any)[key] = deleteField();
+        }
+      });
 
       await updateDoc(doc(db, 'tasks', taskId), cleanUpdates);
       console.log("updateTask: Success");
