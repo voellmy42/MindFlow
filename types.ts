@@ -33,6 +33,14 @@ export interface Task {
   notes?: string;
   ownerId?: string; // For syncing/sharing
   listId?: string | number; // Link to a List
+  recurrence?: RecurrenceRule;
+}
+
+export type RecurrenceInterval = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export interface RecurrenceRule {
+  interval: number;
+  unit: 'days' | 'weeks' | 'months' | 'years';
 }
 
 export interface Recipe {

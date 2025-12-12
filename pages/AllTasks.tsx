@@ -6,17 +6,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Circle, CalendarDays, User, AlignLeft } from 'lucide-react';
 import { hapticImpact } from '../services/haptics';
 import { TaskDetailModal } from '../components/TaskDetailModal';
-import { useTasks, useLists } from '../hooks/useFireStore'; // IMPORT FIRESTORE
+import { useTasks, useLists, useTaskActions } from '../hooks/useFireStore'; // IMPORT FIRESTORE
 import { db } from '../lib/firebase';
 import { updateDoc, doc } from 'firebase/firestore';
 
 // --- Task Item ---
 const TaskItem: React.FC<{ task: Task; lists: any[]; onSelect: (t: Task) => void }> = ({ task, lists, onSelect }) => {
+  const { completeTask } = useTaskActions();
+
   const handleComplete = (e: React.MouseEvent) => {
     e.stopPropagation();
     hapticImpact.light();
     if (task.id) {
-      updateDoc(doc(db, 'tasks', String(task.id)), { status: TaskStatus.DONE });
+      completeTask(task);
     }
   };
 

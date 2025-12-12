@@ -231,6 +231,54 @@ export const useTasks = (config?: {
   return { tasks, loading, addTask, updateTask, deleteTask };
 };
 
+// --- TASKS HOOK (Extended) ---
+// Note: Ideally move these logic implementations to a service if they grow too large
+export const useTaskActions = () => {
+  const { addTask, updateTask } = useTasks();
+
+  const completeTask = async (task: Task) => {
+    // 1. Mark original as DONE
+    await updateTask(String(task.id), { status: TaskStatus.DONE });
+
+    // 2. Check for recurrence
+    if (task.recurrence) {
+      console.log("Recurrence detected:", task.recurrence);
+      const { interval, unit } = task.recurrence;
+
+      // Calculate next date based on TODAY (User requested: "Creates new task once previous one is completed")
+      // Implementation: Date.now() + interval
+      const now = new Date();
+      const nextDate = new Date();
+
+      // Simple calculation
+      if (unit === 'days') nextDate.setDate(now.getDate() + interval);
+      if (unit === 'weeks') nextDate.setDate(now.getDate() + (interval * 7));
+      if (unit === 'months') nextDate.setMonth(now.getMonth() + interval);
+      if (unit === 'years') nextDate.setFullYear(now.getFullYear() + interval);
+
+      // Set to same time if originally had a time, or keep defaults. 
+      // Usually we want to preserve "Due Date" semantics (often just the day).
+      // Let's reset to noon to be safe for "All Day" tasks if needed, or keep time if user uses time.
+      // For now, simple date check.
+
+      const newTask: Partial<Task> = {
+        content: task.content,
+        status: TaskStatus.INBOX, // Or TODO? Defaulting to INBOX for now so user sees it
+        dueAt: nextDate.getTime(),
+        responsible: task.responsible,
+        notes: task.notes,
+        listId: task.listId,
+        recurrence: task.recurrence, // Keep recursing
+        source: 'manual' // Technically automatic, but 'manual' keeps it editable easily
+      };
+
+      await addTask(newTask);
+    }
+  };
+
+  return { completeTask };
+};
+
 // --- RECIPES HOOK ---
 export const useRecipes = () => {
   const [recipes, setRecipes] = useState<any[]>([]);

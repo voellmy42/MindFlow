@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useLists, useTasks, useStaging } from '../hooks/useFireStore'; // Updated hook
+import { useLists, useTasks, useStaging, useTaskActions } from '../hooks/useFireStore'; // Updated hook
 import { TaskStatus } from '../types';
 import { hapticImpact } from '../services/haptics';
 import { playSynthSound } from '../services/sounds';
@@ -217,6 +217,7 @@ const ListDetailView = ({ list, onClose, onDelete, onShare }: { list: any, onClo
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     // Pass listId to filter tasks for this specific list
     const { tasks, addTask, updateTask } = useTasks({ listId: list.id, excludeDeleted: true });
+    const { completeTask } = useTaskActions();
 
     const displayTasks = tasks.filter(t => t.status !== TaskStatus.DONE);
 
@@ -228,12 +229,12 @@ const ListDetailView = ({ list, onClose, onDelete, onShare }: { list: any, onClo
         setInput('');
     };
 
-    const toggleTask = async (taskId: string) => {
-        console.log("Toggling task:", taskId);
+    const toggleTask = async (task: Task) => {
+        console.log("Toggling task:", task.id);
         hapticImpact.light();
         playSynthSound('success');
         try {
-            await updateTask(taskId, { status: TaskStatus.DONE });
+            await completeTask(task);
             console.log("Task toggled successfully");
         } catch (e) {
             console.error("Task toggle failed:", e);
@@ -290,7 +291,7 @@ const ListDetailView = ({ list, onClose, onDelete, onShare }: { list: any, onClo
                             onClick={() => setEditingTask(task)}
                         >
                             <button
-                                onClick={(e) => { e.stopPropagation(); toggleTask(task.id); }}
+                                onClick={(e) => { e.stopPropagation(); toggleTask(task); }}
                                 className="p-1 -m-1 text-cozy-300 hover:text-green-500 transition-colors shrink-0"
                             >
                                 <Circle size={24} />

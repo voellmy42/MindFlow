@@ -7,15 +7,15 @@ import { Circle, CheckCircle2, LogOut } from 'lucide-react';
 import { hapticImpact } from '../services/haptics';
 import { useAuth } from '../contexts/AuthContext';
 import { TaskDetailModal } from '../components/TaskDetailModal';
-import { useTasks } from '../hooks/useFireStore'; // IMPORT FIRESTORE Hook
+import { useTasks, useTaskActions } from '../hooks/useFireStore'; // IMPORT FIRESTORE Hook
 import { playSynthSound } from '../services/sounds';
 import { useInstallPrompt } from '../contexts/InstallContext';
 import { Download } from 'lucide-react';
 
-const TaskItem: React.FC<{ task: any, onSelect: (t: Task) => void, onComplete: (id: string) => void }> = ({ task, onSelect, onComplete }) => {
+const TaskItem: React.FC<{ task: any, onSelect: (t: Task) => void, onComplete: (task: Task) => void }> = ({ task, onSelect, onComplete }) => {
   const handleComplete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onComplete(task.id);
+    onComplete(task);
   };
 
   return (
@@ -57,11 +57,12 @@ export const Inbox = () => {
   // Ideally useTasks supports counting or we fetch all valid tasks and filter locally for small datasets.
   // For now, let's just fetch inbox tasks to count them
   const { tasks: inboxTasks } = useTasks({ status: TaskStatus.INBOX, excludeDeleted: true });
+  const { completeTask } = useTaskActions();
 
-  const handleComplete = (taskId: string) => {
+  const handleComplete = (task: Task) => {
     hapticImpact.light();
     playSynthSound('success');
-    updateTask(taskId, { status: TaskStatus.DONE });
+    completeTask(task);
   };
 
   return (
