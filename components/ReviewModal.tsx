@@ -117,16 +117,41 @@ export const ReviewModal = ({ item, onClose }: { item: any, onClose: () => void 
                 )}
             </div>
 
-            <div className="flex-1 relative w-full max-w-sm mx-auto min-h-[350px]">
-                <AnimatePresence>
-                    {localTasks.map((task, index) => (
-                        <ReviewCard
-                            key={task.id || index}
-                            task={task}
-                            index={index}
-                            onSwipe={handleSwipe}
-                        />
-                    )).reverse()}
+            <div className="flex-1 relative w-full max-w-sm mx-auto min-h-[350px] flex items-center justify-center">
+                <AnimatePresence mode="wait">
+                    {localTasks.length === 0 ? (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            className="bg-white/50 backdrop-blur-sm p-8 rounded-3xl border border-cozy-100 text-center w-full"
+                        >
+                            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Check size={32} />
+                            </div>
+                            <h3 className="text-xl font-bold text-cozy-900 mb-2">All Clear!</h3>
+                            <p className="text-cozy-500 mb-6">No actionable tasks found in this note.</p>
+                            <button
+                                onClick={async () => {
+                                    hapticImpact.medium();
+                                    await deleteStagingItem(item.id);
+                                    onClose();
+                                }}
+                                className="w-full py-3 bg-cozy-900 text-white rounded-xl font-bold hover:bg-black transition-colors"
+                            >
+                                Dismiss Review
+                            </button>
+                        </motion.div>
+                    ) : (
+                        localTasks.map((task, index) => (
+                            <ReviewCard
+                                key={task.id || index}
+                                task={task}
+                                index={index}
+                                onSwipe={handleSwipe}
+                            />
+                        )).reverse()
+                    )}
                 </AnimatePresence>
             </div>
 

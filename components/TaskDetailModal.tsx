@@ -1,7 +1,8 @@
 
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLists, useTasks } from '../hooks/useFireStore'; // IMPORT FIRESTORE
+import { useDebounce } from '../hooks/useDebounce';
 import { Task } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar as CalendarIcon, List as ListIcon, User, AlignLeft, Save, ChevronLeft, ChevronRight, Slash } from 'lucide-react';
@@ -116,19 +117,30 @@ export const TaskDetailModal: React.FC<{ task: Task; onClose: () => void }> = ({
     const { lists } = useLists();
     const { updateTask } = useTasks();
 
-    const handleSave = async () => {
-        hapticImpact.success();
-        if (task.id) {
-            await updateTask(String(task.id), {
-                content,
+    const debouncedContent = useDebounce(content, 500);
+    const debouncedNotes = useDebounce(notes, 500);
+    const debouncedResponsible = useDebounce(responsible, 500);
+
+    useEffect(() => {
+        if (!task.id) return;
+
+        const hasChanges =
+            debouncedContent !== task.content ||
+            (dueAt ? dueAt.getTime() : undefined) !== task.dueAt ||
+            debouncedResponsible !== (task.responsible || '') ||
+            debouncedNotes !== (task.notes || '') ||
+            listId !== task.listId;
+
+        if (hasChanges) {
+            updateTask(String(task.id), {
+                content: debouncedContent,
                 dueAt: dueAt ? dueAt.getTime() : undefined,
-                responsible,
-                notes,
+                responsible: debouncedResponsible,
+                notes: debouncedNotes,
                 listId
             });
         }
-        onClose();
-    };
+    }, [debouncedContent, debouncedNotes, debouncedResponsible, dueAt, listId, task, updateTask]);
 
     return (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center pointer-events-none">
@@ -187,7 +199,7 @@ export const TaskDetailModal: React.FC<{ task: Task; onClose: () => void }> = ({
                 </div>
 
                 <div className="p-6 border-t border-cozy-100 bg-white/90 backdrop-blur-md pb-10 sm:pb-8 rounded-b-[2rem] shrink-0 z-20 sticky bottom-0">
-                    <button onClick={handleSave} className="w-full py-4 bg-cozy-900 text-white rounded-2xl font-bold text-lg shadow-xl shadow-cozy-200 flex items-center justify-center gap-3 active:scale-[0.98] transition-all"><Save size={24} />Save Changes</button>
+                    <p className="text-center text-sm text-cozy-400 font-medium">Changes specified here are saved automatically.</p>
                 </div>
 
                 <AnimatePresence>{showCalendar && (<CalendarPicker selectedDate={dueAt} onSelect={setDueAt} onClose={() => setShowCalendar(false)} />)}</AnimatePresence>
