@@ -21,6 +21,13 @@ export interface List {
   lastSyncedAt?: number;
 }
 
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+}
+
 export interface Task {
   id?: string | number;
   publicId?: string; // Unique UUID for syncing items across devices
@@ -30,6 +37,8 @@ export interface Task {
   dueAt?: number | null;
   source?: 'manual' | 'share' | 'recipe' | 'voice';
   responsible?: string;
+  assigneeEmail?: string;
+  assigneeAvatar?: string;
   notes?: string;
   ownerId?: string; // For syncing/sharing
   listId?: string | number; // Link to a List

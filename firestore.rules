@@ -16,6 +16,12 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
+    // USERS (For autocomplete and profile syncing)
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+
     // LISTS
     match /lists/{listId} {
       allow read, write: if isAuthenticated();

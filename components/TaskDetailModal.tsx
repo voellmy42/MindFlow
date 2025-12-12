@@ -1,12 +1,14 @@
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLists, useTasks } from '../hooks/useFireStore'; // IMPORT FIRESTORE
 import { useDebounce } from '../hooks/useDebounce';
-import { Task, RecurrenceRule } from '../types';
+import { Task, RecurrenceRule, User } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar as CalendarIcon, List as ListIcon, User, AlignLeft, Save, ChevronLeft, ChevronRight, Slash, RotateCcw } from 'lucide-react';
+import { X, Calendar as CalendarIcon, List as ListIcon, User as UserIcon, AlignLeft, Save, ChevronLeft, ChevronRight, Slash, RotateCcw } from 'lucide-react';
 import { hapticImpact } from '../services/haptics';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 // --- Calendar Picker Component (Unchanged) ---
 const CalendarPicker = ({ selectedDate, onSelect, onClose }: { selectedDate: Date | null, onSelect: (d: Date | null) => void, onClose: () => void }) => {
@@ -108,12 +110,21 @@ const CalendarPicker = ({ selectedDate, onSelect, onClose }: { selectedDate: Dat
 export const TaskDetailModal: React.FC<{ task: Task; onClose: () => void }> = ({ task, onClose }) => {
     const [content, setContent] = useState(task.content);
     const [dueAt, setDueAt] = useState<Date | null>(task.dueAt ? new Date(task.dueAt) : null);
-    const [responsible, setResponsible] = useState(task.responsible || '');
     const [notes, setNotes] = useState(task.notes || '');
     const [listId, setListId] = useState(task.listId);
     const [recurrence, setRecurrence] = useState<RecurrenceRule | undefined>(task.recurrence);
     const [showRecurrence, setShowRecurrence] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
+
+    // Assignment State
+    const [assigneeEmail, setAssigneeEmail] = useState(task.assigneeEmail || '');
+    const [assigneeAvatar, setAssigneeAvatar] = useState(task.assigneeAvatar || '');
+    const [responsible, setResponsible] = useState(task.responsible || ''); // Display name
+
+    // Autocomplete State
+    const [userQuery, setUserQuery] = useState('');
+    const [userResults, setUserResults] = useState<User[]>([]);
+    const [showUserResults, setShowUserResults] = useState(false);
 
     // Use Firestore Hooks
     const { lists } = useLists();
@@ -121,15 +132,58 @@ export const TaskDetailModal: React.FC<{ task: Task; onClose: () => void }> = ({
 
     const debouncedContent = useDebounce(content, 500);
     const debouncedNotes = useDebounce(notes, 500);
-    const debouncedResponsible = useDebounce(responsible, 500);
+    const debouncedUserQuery = useDebounce(userQuery, 300);
 
+    // Initial load for responsible name if not editing
+    useEffect(() => {
+        if (!userQuery && task.responsible) {
+            // Just keeping state in sync
+        }
+    }, [task.responsible]);
+
+    // Search Users Effect
+    useEffect(() => {
+        const searchUsers = async () => {
+            if (!debouncedUserQuery || debouncedUserQuery.length < 2) {
+                setUserResults([]);
+                return;
+            }
+
+            try {
+                // Search by email prefix
+                // Note: Firestore doesn't do substring search easily.
+                // We use >= query and <= query + \uf8ff for prefix matching
+                const q = query(
+                    collection(db, 'users'),
+                    where('email', '>=', debouncedUserQuery.toLowerCase()),
+                    where('email', '<=', debouncedUserQuery.toLowerCase() + '\uf8ff'),
+                    limit(5)
+                );
+
+                const snapshot = await getDocs(q);
+                const users: User[] = [];
+                snapshot.forEach(doc => users.push(doc.data() as User));
+
+                setUserResults(users);
+                setShowUserResults(users.length > 0);
+            } catch (error) {
+                console.error("Error searching users", error);
+            }
+        };
+
+        searchUsers();
+    }, [debouncedUserQuery]);
+
+    // Auto-save Effect
     useEffect(() => {
         if (!task.id) return;
 
         const hasChanges =
             debouncedContent !== task.content ||
             (dueAt ? dueAt.getTime() : undefined) !== task.dueAt ||
-            debouncedResponsible !== (task.responsible || '') ||
+            responsible !== (task.responsible || '') ||
+            assigneeEmail !== (task.assigneeEmail || '') ||
+            assigneeAvatar !== (task.assigneeAvatar || '') ||
             debouncedNotes !== (task.notes || '') ||
             listId !== task.listId ||
             JSON.stringify(recurrence) !== JSON.stringify(task.recurrence);
@@ -138,13 +192,15 @@ export const TaskDetailModal: React.FC<{ task: Task; onClose: () => void }> = ({
             updateTask(String(task.id), {
                 content: debouncedContent,
                 dueAt: dueAt ? dueAt.getTime() : null,
-                responsible: debouncedResponsible,
+                responsible: responsible,
+                assigneeEmail: assigneeEmail,
+                assigneeAvatar: assigneeAvatar,
                 notes: debouncedNotes,
                 listId,
                 recurrence
             });
         }
-    }, [debouncedContent, debouncedNotes, debouncedResponsible, dueAt, listId, recurrence, task, updateTask]);
+    }, [debouncedContent, debouncedNotes, responsible, assigneeEmail, assigneeAvatar, dueAt, listId, recurrence, task, updateTask]);
 
     const handleRecurrenceSelect = (type: 'none' | 'daily' | 'weekly' | 'monthly') => {
         if (type === 'none') setRecurrence(undefined);
@@ -153,6 +209,22 @@ export const TaskDetailModal: React.FC<{ task: Task; onClose: () => void }> = ({
         if (type === 'monthly') setRecurrence({ interval: 1, unit: 'months' });
         setShowRecurrence(false);
     }
+
+    const handleUserSelect = (user: User) => {
+        setResponsible(user.name);
+        setAssigneeEmail(user.email);
+        setAssigneeAvatar(user.avatar || '');
+        setUserQuery('');
+        setShowUserResults(false);
+        hapticImpact.light();
+    };
+
+    const handleClearAssignment = () => {
+        setResponsible('');
+        setAssigneeEmail('');
+        setAssigneeAvatar('');
+        setUserQuery('');
+    };
 
     return (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center pointer-events-none">
@@ -244,13 +316,70 @@ export const TaskDetailModal: React.FC<{ task: Task; onClose: () => void }> = ({
                             </div>
                         </div>
 
-                        {/* Assigned To */}
-                        <div className="flex items-center gap-3 p-3 bg-cozy-50 rounded-xl border border-transparent focus-within:border-rose-200 focus-within:bg-rose-50/30 transition-all">
-                            <div className="p-2 bg-white shadow-sm text-rose-600 rounded-lg"><User size={20} /></div>
-                            <div className="flex-1">
-                                <div className="text-[10px] font-bold text-cozy-400 uppercase tracking-wide mb-0.5">Assigned To</div>
-                                <input type="text" value={responsible} onChange={(e) => setResponsible(e.target.value)} placeholder="Add person..." className="w-full bg-transparent text-base font-medium text-cozy-900 outline-none placeholder:text-cozy-400" />
+                        {/* Assigned To - Updated for Autocomplete */}
+                        <div className="relative z-20">
+                            <div className="flex items-center gap-3 p-3 bg-cozy-50 rounded-xl border border-transparent focus-within:border-rose-200 focus-within:bg-rose-50/30 transition-all">
+                                <div className="shrink-0 p-2 bg-white shadow-sm text-rose-600 rounded-lg overflow-hidden">
+                                    {assigneeAvatar ? (
+                                        <img src={assigneeAvatar} alt="Assignee" className="w-5 h-5 rounded-full object-cover" />
+                                    ) : (
+                                        <UserIcon size={20} />
+                                    )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-[10px] font-bold text-cozy-400 uppercase tracking-wide mb-0.5">Assigned To</div>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={responsible || userQuery}
+                                            onChange={(e) => {
+                                                if (responsible) {
+                                                    // If editing existing, clear assignment and start search
+                                                    handleClearAssignment();
+                                                    setUserQuery(e.target.value);
+                                                } else {
+                                                    setUserQuery(e.target.value);
+                                                }
+                                            }}
+                                            onFocus={() => {
+                                                if (responsible) {
+                                                    // Don't modify if already assigned, user must clear explicitly or type to replace (handled in logic above essentially)
+                                                }
+                                            }}
+                                            placeholder="Assign by email..."
+                                            className="w-full bg-transparent text-base font-medium text-cozy-900 outline-none placeholder:text-cozy-400"
+                                        />
+                                        {responsible && (
+                                            <button onClick={handleClearAssignment} className="p-1 rounded-full hover:bg-black/5 text-cozy-400"><X size={14} /></button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
+
+                            <AnimatePresence>
+                                {showUserResults && userResults.length > 0 && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl z-30 p-1 border border-cozy-100 max-h-[200px] overflow-y-auto"
+                                    >
+                                        {userResults.map(user => (
+                                            <button
+                                                key={user.id}
+                                                onClick={() => handleUserSelect(user)}
+                                                className="w-full flex items-center gap-3 p-2 hover:bg-cozy-50 rounded-lg transition-colors text-left"
+                                            >
+                                                <img src={user.avatar || `https://api.dicebear.com/7.x/notionists/svg?seed=${user.id}`} alt="" className="w-8 h-8 rounded-full bg-cozy-100" />
+                                                <div className="flex-1 overflow-hidden">
+                                                    <div className="text-sm font-bold text-cozy-900 truncate">{user.name}</div>
+                                                    <div className="text-xs text-cozy-500 truncate">{user.email}</div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
 
                         {/* Notes */}

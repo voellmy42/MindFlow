@@ -1,15 +1,10 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, googleProvider } from '../lib/firebase';
+import { auth, googleProvider, db } from '../lib/firebase';
 import { signInWithPopup, signOut, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { hapticImpact } from '../services/haptics';
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-}
+import { User } from '../types'; // Import User from types
 
 interface AuthContextType {
   user: User | null;
@@ -31,25 +26,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Safety Timeout: If Firebase doesn't respond in 4 seconds, stop loading so user sees Login screen.
     const timeoutTimer = setTimeout(() => {
-        if (mounted && isLoading) {
-            console.warn("Auth check timed out. Defaulting to logged out state.");
-            setIsLoading(false);
-        }
+      if (mounted && isLoading) {
+        console.warn("Auth check timed out. Defaulting to logged out state.");
+        setIsLoading(false);
+      }
     }, 4000);
 
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!mounted) return;
-      
+
       // Clear safety timer as we got a response
       clearTimeout(timeoutTimer);
 
       if (firebaseUser) {
-        setUser({
+        const userData: User = {
           id: firebaseUser.uid,
           name: firebaseUser.displayName || 'Guest',
           email: firebaseUser.email || '',
           avatar: firebaseUser.photoURL || `https://api.dicebear.com/7.x/notionists/svg?seed=${firebaseUser.uid}`
-        });
+        };
+
+        setUser(userData);
+
+        // SYNC USER TO FIRESTORE (For autocomplete)
+        try {
+          await setDoc(doc(db, 'users', firebaseUser.uid), {
+            ...userData,
+            lastSeen: serverTimestamp()
+          }, { merge: true });
+        } catch (e) {
+          console.error("Failed to sync user profile", e);
+        }
+
       } else {
         setUser(null);
       }
@@ -57,31 +65,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => {
-        mounted = false;
-        clearTimeout(timeoutTimer);
-        unsubscribe();
+      mounted = false;
+      clearTimeout(timeoutTimer);
+      unsubscribe();
     };
   }, []);
 
   const loginWithGoogle = async () => {
     try {
-        await signInWithPopup(auth, googleProvider);
-        hapticImpact.success();
+      await signInWithPopup(auth, googleProvider);
+      hapticImpact.success();
     } catch (error: any) {
-        console.error("Login failed", error);
-        hapticImpact.error();
-        throw error;
+      console.error("Login failed", error);
+      hapticImpact.error();
+      throw error;
     }
   };
 
   const continueAsGuest = async () => {
-     try {
-         await signInAnonymously(auth);
-         hapticImpact.light();
-     } catch (error) {
-         console.error("Guest login failed", error);
-         throw error;
-     }
+    try {
+      await signInAnonymously(auth);
+      hapticImpact.light();
+    } catch (error) {
+      console.error("Guest login failed", error);
+      throw error;
+    }
   };
 
   const logout = async () => {
