@@ -2,7 +2,7 @@ import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { Inbox, Layers, List, Calendar } from 'lucide-react';
 import { vibrate } from '../services/haptics';
-import { useTasks } from '../hooks/useFireStore';
+import { useTasks, useTriageTasks } from '../hooks/useFireStore';
 import { TaskStatus } from '../types';
 
 const NavItem = ({ to, icon: Icon, active, label, badgeCount }: { to: string; icon: any; active: boolean; label: string; badgeCount?: number }) => (
@@ -26,7 +26,7 @@ const NavItem = ({ to, icon: Icon, active, label, badgeCount }: { to: string; ic
 
 export const Navigation = () => {
   const location = useLocation();
-  const { tasks: inboxTasks } = useTasks({ status: TaskStatus.INBOX, excludeDeleted: true });
+  const { tasks: inboxTasks } = useTriageTasks();
   const { tasks: todayTasks } = useTasks({ status: TaskStatus.TODAY, excludeDeleted: true });
 
   const activeTasksCount = todayTasks.filter(t => t.status !== TaskStatus.DONE).length;

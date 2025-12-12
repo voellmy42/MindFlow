@@ -27,7 +27,7 @@ export interface Task {
   content: string;
   status: TaskStatus;
   createdAt: number;
-  dueAt?: number;
+  dueAt?: number | null;
   source?: 'manual' | 'share' | 'recipe' | 'voice';
   responsible?: string;
   notes?: string;

@@ -231,6 +231,95 @@ export const useTasks = (config?: {
   return { tasks, loading, addTask, updateTask, deleteTask };
 };
 
+// --- TRIAGE HOOK ---
+export const useTriageTasks = () => {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const { lists } = useLists(); // We need lists to find shared ones
+
+  useEffect(() => {
+    if (!user) {
+      setTasks([]);
+      return;
+    }
+
+    // 1. Owned Tasks (INBOX)
+    const ownedRef = collection(db, 'tasks');
+    const ownedQ = query(
+      ownedRef,
+      where('ownerId', '==', user.id),
+      where('status', '==', TaskStatus.INBOX)
+    );
+
+    // 2. Shared Tasks (INBOX) - from lists where I am an editor
+    // We already have 'lists' from useLists which includes shared lists
+    const sharedListIds = lists
+      .filter(l => l.role === 'editor')
+      .map(l => l.id);
+
+    console.log("useTriageTasks: Shared Lists", sharedListIds);
+
+    // We can't easily wait for multiple onSnapshots in a clean linear way without managing state carefully.
+    // So we'll set up listeners for both query sets if needed.
+
+    // BUT: 'in' query supports max 10/30 items. If user has many shared lists, this breaks.
+    // Optimistic approach: Most users have few shared lists.
+    let unsubShared: () => void = () => { };
+    let ownedTasks: Task[] = [];
+    let sharedTasks: Task[] = [];
+
+    const updateCombined = () => {
+      const all = [...ownedTasks, ...sharedTasks];
+      // Deduplicate
+      const unique = Array.from(new Map(all.map(t => [t.id, t])).values());
+
+      // FILTER: Exclude tasks with dueAt (Scheduled)
+      const unscheduled = unique.filter(t => !t.dueAt);
+
+      // Sort by creation
+      unscheduled.sort((a, b) => b.createdAt - a.createdAt);
+
+      setTasks(unscheduled);
+      setLoading(false);
+    };
+
+    const unsubOwned = onSnapshot(ownedQ, (snapshot) => {
+      ownedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+      updateCombined();
+    });
+
+    if (sharedListIds.length > 0) {
+      // Chunking if > 10? For now assume < 10 shared lists.
+      // Actually firestore 'in' limit is 10.
+      // If > 10, we might need multiple queries or just fetch all lists?
+      // Let's safe guard: slice to 10.
+      const safeSharedIds = sharedListIds.slice(0, 10);
+
+      const sharedQ = query(
+        collection(db, 'tasks'),
+        where('listId', 'in', safeSharedIds),
+        where('status', '==', TaskStatus.INBOX)
+      );
+
+      unsubShared = onSnapshot(sharedQ, (snapshot) => {
+        sharedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+        updateCombined();
+      });
+    }
+
+    return () => {
+      unsubOwned();
+      unsubShared();
+    };
+
+  }, [user, lists]); // Re-run if lists change (new shared list added)
+
+  const { updateTask } = useTasks(); // Reuse update logic
+
+  return { tasks, loading, updateTask };
+};
+
 // --- TASKS HOOK (Extended) ---
 // Note: Ideally move these logic implementations to a service if they grow too large
 export const useTaskActions = () => {

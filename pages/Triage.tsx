@@ -4,7 +4,7 @@ import { motion, useMotionValue, useTransform, AnimatePresence, PanInfo } from '
 import { Task, TaskStatus } from '../types';
 import { hapticImpact } from '../services/haptics';
 import { Check, Clock, Trash2 } from 'lucide-react';
-import { useTasks } from '../hooks/useFireStore'; // IMPORT FIRESTORE
+import { useTasks, useTriageTasks } from '../hooks/useFireStore'; // IMPORT FIRESTORE
 import confetti from 'canvas-confetti';
 import { playSynthSound } from '../services/sounds';
 
@@ -59,7 +59,7 @@ const Card: React.FC<{ task: Task; onSwipe: (dir: 'left' | 'right' | 'down') => 
 
 export const Triage = () => {
   // Use Firestore Hook
-  const { tasks: inboxTasks, updateTask } = useTasks({ status: TaskStatus.INBOX, excludeDeleted: true });
+  const { tasks: inboxTasks, updateTask } = useTriageTasks();
 
   // Track previous length to determine transitions
   const prevCountRef = React.useRef(inboxTasks?.length || 0);

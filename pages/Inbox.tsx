@@ -7,7 +7,7 @@ import { Circle, CheckCircle2, LogOut } from 'lucide-react';
 import { hapticImpact } from '../services/haptics';
 import { useAuth } from '../contexts/AuthContext';
 import { TaskDetailModal } from '../components/TaskDetailModal';
-import { useTasks, useTaskActions } from '../hooks/useFireStore'; // IMPORT FIRESTORE Hook
+import { useTasks, useTaskActions, useTriageTasks } from '../hooks/useFireStore'; // IMPORT FIRESTORE Hook
 import { playSynthSound } from '../services/sounds';
 import { useInstallPrompt } from '../contexts/InstallContext';
 import { Download } from 'lucide-react';
@@ -55,8 +55,8 @@ export const Inbox = () => {
   const { tasks: todayTasks, updateTask } = useTasks({ status: TaskStatus.TODAY, excludeDeleted: true });
   // We need a separate query for Inbox count if we want to show it.
   // Ideally useTasks supports counting or we fetch all valid tasks and filter locally for small datasets.
-  // For now, let's just fetch inbox tasks to count them
-  const { tasks: inboxTasks } = useTasks({ status: TaskStatus.INBOX, excludeDeleted: true });
+  // Use Triage Tasks to count (excludes scheduled items, includes shared)
+  const { tasks: inboxTasks } = useTriageTasks();
   const { completeTask } = useTaskActions();
 
   const handleComplete = (task: Task) => {

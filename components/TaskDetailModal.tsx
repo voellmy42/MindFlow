@@ -137,7 +137,7 @@ export const TaskDetailModal: React.FC<{ task: Task; onClose: () => void }> = ({
         if (hasChanges) {
             updateTask(String(task.id), {
                 content: debouncedContent,
-                dueAt: dueAt ? dueAt.getTime() : undefined,
+                dueAt: dueAt ? dueAt.getTime() : null,
                 responsible: debouncedResponsible,
                 notes: debouncedNotes,
                 listId,
