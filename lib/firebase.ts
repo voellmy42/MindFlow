@@ -3,6 +3,8 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 
+import { getMessaging } from 'firebase/messaging';
+
 // ------------------------------------------------------------------
 // FIREBASE CONFIGURATION
 // ------------------------------------------------------------------
@@ -20,6 +22,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const messaging = getMessaging(app);
 const googleProvider = new GoogleAuthProvider();
 
 // Enable Offline Persistence
@@ -34,4 +37,4 @@ enableIndexedDbPersistence(db).catch((err) => {
     }
 });
 
-export { app, auth, db, googleProvider };
+export { app, auth, db, messaging, googleProvider };

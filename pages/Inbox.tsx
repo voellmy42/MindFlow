@@ -10,7 +10,8 @@ import { TaskDetailModal } from '../components/TaskDetailModal';
 import { useTasks, useTaskActions, useTriageTasks } from '../hooks/useFireStore'; // IMPORT FIRESTORE Hook
 import { playSynthSound } from '../services/sounds';
 import { useInstallPrompt } from '../contexts/InstallContext';
-import { Download } from 'lucide-react';
+import { Download, Bell } from 'lucide-react'; // Added Bell
+import { useNotifications } from '../hooks/useNotifications'; // Import Notification Hook
 
 const TaskItem: React.FC<{ task: any, onSelect: (t: Task) => void, onComplete: (task: Task) => void }> = ({ task, onSelect, onComplete }) => {
   const handleComplete = (e: React.MouseEvent) => {
@@ -47,6 +48,7 @@ import { ReviewModal } from '../components/ReviewModal';
 export const Inbox = () => {
   const { user, logout } = useAuth();
   const { isInstallable, handleInstallClick } = useInstallPrompt();
+  const { permission, requestPermission } = useNotifications(); // Use Notification Hook
   const [showProfile, setShowProfile] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [reviewItem, setReviewItem] = useState<any | null>(null);
@@ -114,6 +116,14 @@ export const Inbox = () => {
                       className="w-full text-left px-3 py-2 text-sm text-cozy-700 hover:bg-cozy-50 rounded-xl transition-colors flex items-center gap-2"
                     >
                       <Download size={14} /> Install App
+                    </button>
+                  )}
+                  {permission === 'default' && (
+                    <button
+                      onClick={() => { requestPermission(); setShowProfile(false); }}
+                      className="w-full text-left px-3 py-2 text-sm text-cozy-700 hover:bg-cozy-50 rounded-xl transition-colors flex items-center gap-2"
+                    >
+                      <Bell size={14} /> Enable Notifications
                     </button>
                   )}
                 </motion.div>

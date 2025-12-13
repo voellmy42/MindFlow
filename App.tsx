@@ -18,6 +18,7 @@ import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/fir
 import { TaskStatus } from './types';
 import { hapticImpact } from './services/haptics';
 import { CommandPalette } from './components/CommandPalette'; // Import CommandPalette
+import { useNotifications } from './hooks/useNotifications'; // Import Notification Hook
 
 // --- Wake Up Service ---
 // Checks for tasks that were snoozed or scheduled for the past/today and moves them to TODAY status
@@ -67,6 +68,7 @@ const WakeUpService = () => {
 
 const AppContent = () => {
   const { isAuthenticated, isLoading } = useAuth();
+  useNotifications(); // Initialize notification listeners
 
   if (isLoading) {
     return (

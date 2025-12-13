@@ -15,6 +15,41 @@ const ASSETS_TO_CACHE = [
   'https://aistudiocdn.com/@google/genai@^1.32.0'
 ];
 
+// Give the service worker access to Firebase Messaging.
+// Note that you can only use Firebase Messaging here. Other Firebase libraries
+// are not available in the service worker.
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
+
+// Initialize the Firebase app in the service worker by passing in
+// your app's Firebase config object.
+// https://firebase.google.com/docs/web/setup#config-object
+firebase.initializeApp({
+  apiKey: "AIzaSyDor_60oq0OHGtA7iRBtHYkCCrvXl5rdfw",
+  authDomain: "mindflow-9335f.firebaseapp.com",
+  projectId: "mindflow-9335f",
+  storageBucket: "mindflow-9335f.firebasestorage.app",
+  messagingSenderId: "692513852890",
+  appId: "1:692513852890:web:47764a4767b1b8a16844e3",
+  measurementId: "G-1FGBFFT41E"
+});
+
+// Retrieve an instance of Firebase Messaging so that it can handle background
+// messages.
+const messaging = firebase.messaging();
+
+messaging.onBackgroundMessage((payload) => {
+  console.log('[firebase-messaging-sw.js] Received background message ', payload);
+  // Customize notification here
+  const notificationTitle = payload.notification.title;
+  const notificationOptions = {
+    body: payload.notification.body,
+    icon: '/icon-192.png'
+  };
+
+  self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
