@@ -17,6 +17,7 @@ import { db } from './lib/firebase'; // Firestore
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { TaskStatus } from './types';
 import { hapticImpact } from './services/haptics';
+import { CommandPalette } from './components/CommandPalette'; // Import CommandPalette
 
 // --- Wake Up Service ---
 // Checks for tasks that were snoozed or scheduled for the past/today and moves them to TODAY status
@@ -83,6 +84,7 @@ const AppContent = () => {
     <Router>
       <WakeUpService />
       <ShareHandler />
+      <CommandPalette />
       {/* <InstallPrompt /> Removed global overlay */}
       <div className="min-h-screen bg-cozy-50 text-cozy-900 font-sans antialiased selection:bg-rose-200 selection:text-rose-900">
         <main className="max-w-md mx-auto h-full min-h-screen bg-white shadow-2xl overflow-hidden relative">
